@@ -8,11 +8,11 @@ Semantic search over your Logseq graph using local or hosted AI embeddings. Find
 
 ## How It Works
 
-1. Your `.md` files are read directly from disk (not via the Logseq API)
+1. File graphs read `.md` files directly from disk; DB graphs read page data through Logseq's API
 2. Each page is chunked into blocks and embedded using the configured provider
 3. Embeddings are stored in a [LanceDB](https://lancedb.com) database on your machine
 4. `vector_search` queries combine vector similarity + full-text search with RRF reranking
-5. When your notes change, an incremental sync re-embeds only the changed files
+5. When your notes change, an incremental sync re-embeds only changed pages
 
 LanceDB always runs locally. With Ollama, note text also stays local. OpenAI and
 other hosted providers receive the chunks and search queries they embed; review
@@ -134,9 +134,25 @@ This keeps everything in one place:
   db/           ← generated, do not edit
 ```
 
+### Logseq 2.x DB graphs
+
+Set `LOGSEQ_DB_MODE=auto` to detect the active graph, or `true` when the graph
+is a Logseq 2.x DB graph. The sync
+writer then uses Logseq's DB API (`logseq.cli.listPages` and
+`logseq.cli.getPageData`) instead of looking for Markdown files. The Logseq
+desktop application must be running with its HTTP API enabled, and
+`LOGSEQ_API_TOKEN` must be available to the sync process.
+
+DB graph state is tracked by page UUID. After changing index filters or
+switching between file and DB mode, run a full rebuild:
+
+```bash
+LOGSEQ_DB_MODE=auto logseq-sync --rebuild
+```
+
 | Field | Required | Description |
 | --- | --- | --- |
-| `logseq_graph_path` | ✅ | Path to your Logseq graph directory (contains `pages/` and `journals/`) |
+| `logseq_graph_path` | ✅ | Path to a file graph directory, or the configured graph path used for DB-mode status reporting |
 | `exclude_tags` | no | **Project-level privacy filter** — pages with these tags are hidden from all tools (list, search, query, get content) *and* excluded from the vector index. Use this for pages with sensitive content (e.g. API keys, personal notes). |
 | `vector.enabled` | ✅ | Must be `true` to activate vector tools |
 | `vector.db_path` | ✅ | Where to store the vector DB — keep it local, not in iCloud |
@@ -148,6 +164,7 @@ This keeps everything in one place:
 | `vector.include_journals` | no | Index journal pages (default: `true`) |
 | `vector.exclude_tags` | no | Additional tags to skip from the vector index only (additive with top-level `exclude_tags`). Use for noise filtering — e.g. large reference dumps that pollute semantic search but are fine to read directly. (default: `[]`) |
 | `vector.min_chunk_length` | no | Minimum characters per chunk (default: `50`) |
+| `LOGSEQ_DB_MODE` | no | Defaults to `auto`; set to `true` for Logseq 2.x DB graphs or `false` for legacy Markdown/file graphs |
 
 **Important:** keep `db_path` outside your iCloud-synced Logseq folder. The DB is a generated binary artifact — syncing it to iCloud wastes bandwidth and can cause corruption.
 
@@ -246,15 +263,19 @@ Semantic search across your notes. Claude calls this when you ask it to find not
 | `filter_tags` | array | — | Only return pages with ALL these tags |
 | `filter_page` | string | — | Restrict to a single page |
 
-**Auto-sync:** If your graph has changed files since the last sync, `vector_search` automatically starts a background sync and returns current results immediately. The next search will benefit from the updated index.
+**Sync ownership:** `vector_search` is read-only and does not start a sync. Run
+the external `logseq-sync` writer on the host that owns the graph and vector DB.
+For DB graphs, the writer reads changes through the Logseq API rather than file
+system events.
 
 ### `sync_vector_db`
 
-Triggers an incremental sync — only changed files are re-embedded. Claude calls this when you ask it to update or sync the search index.
+This tool is an informational pointer to the external `logseq-sync` process. It
+does not write to the vector DB from the MCP server.
 
 | Parameter | Type | Default | Description |
 | --- | --- | --- | --- |
-| `rebuild` | boolean | `false` | Drop and re-index everything from scratch |
+| `rebuild` | boolean | `false` | Ignored by this read-only pointer; run `logseq-sync --rebuild` externally |
 
 Run `logseq-sync --rebuild` if you change the embedding provider, model, or
 configured dimensions.

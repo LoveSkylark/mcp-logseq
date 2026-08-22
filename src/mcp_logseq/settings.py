@@ -26,7 +26,7 @@ class Settings:
     verify_ssl: bool
     connect_timeout: float
     read_timeout: float
-    db_mode: bool
+    db_mode: bool | str
 
     @property
     def timeout(self) -> tuple[float, float]:
@@ -72,6 +72,11 @@ def load_settings() -> Settings:
     else:
         verify_ssl = protocol == "https"
 
+    db_mode_setting = os.getenv("LOGSEQ_DB_MODE", "auto").lower()
+    db_mode = "auto" if db_mode_setting in ("", "auto") else db_mode_setting in (
+        "1", "true", "yes"
+    )
+
     return Settings(
         api_key=api_key,
         protocol=protocol,
@@ -80,7 +85,7 @@ def load_settings() -> Settings:
         verify_ssl=verify_ssl,
         connect_timeout=_parse_positive_float_env("LOGSEQ_API_CONNECT_TIMEOUT", 3),
         read_timeout=_parse_positive_float_env("LOGSEQ_API_READ_TIMEOUT", 6),
-        db_mode=os.getenv("LOGSEQ_DB_MODE", "").lower() in ("1", "true", "yes"),
+        db_mode=db_mode,
     )
 
 

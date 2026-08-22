@@ -200,6 +200,24 @@ class TestLogSeqAPI:
         assert request_data["args"] == []
 
     @responses.activate
+    def test_db_list_pages_uses_cli_api(self, logseq_client_db):
+        responses.add(
+            responses.POST,
+            "http://127.0.0.1:12315/api",
+            json=[{"block/title": "Work", "block/uuid": "page-uuid"}],
+            status=200,
+        )
+
+        result = logseq_client_db.list_pages(expand=True)
+
+        assert result[0]["block/title"] == "Work"
+        request_data = json.loads(responses.calls[0].request.body)
+        assert request_data == {
+            "method": "logseq.cli.listPages",
+            "args": [{"expand": True}],
+        }
+
+    @responses.activate
     def test_get_page_content_success(self, logseq_client, mock_logseq_responses):
         """Test successful page content retrieval."""
         # Mock getPage call
@@ -309,6 +327,23 @@ class TestLogSeqAPI:
         request_data = json.loads(body)
         assert request_data["method"] == "logseq.App.search"
         assert request_data["args"] == ["test query", {}]
+
+    @responses.activate
+    def test_db_search_uses_native_app_api(self, logseq_client_db):
+        responses.add(
+            responses.POST,
+            "http://127.0.0.1:12315/api",
+            json=[],
+            status=200,
+        )
+
+        logseq_client_db.search_content("test query")
+
+        request_data = json.loads(responses.calls[0].request.body)
+        assert request_data == {
+            "method": "logseq.app.search",
+            "args": ["test query", {"enable-snippet?": False}],
+        }
 
     @responses.activate
     def test_search_content_with_options(self, logseq_client, mock_logseq_responses):

@@ -69,6 +69,8 @@ Transform your LogSeq knowledge base into an AI-powered workspace! This MCP serv
 claude mcp add mcp-logseq \
   --env LOGSEQ_API_TOKEN=your_token_here \
   --env LOGSEQ_API_URL=http://localhost:12315 \
+  --env LOGSEQ_API_CONNECT_TIMEOUT=10 \
+  --env LOGSEQ_API_READ_TIMEOUT=60 \
   -- uv run --with mcp-logseq mcp-logseq
 ```
 
@@ -82,7 +84,9 @@ Add to your config file (`Settings → Developer → Edit Config`):
       "args": ["run", "--with", "mcp-logseq", "mcp-logseq"],
       "env": {
         "LOGSEQ_API_TOKEN": "your_token_here",
-        "LOGSEQ_API_URL": "http://localhost:12315"
+        "LOGSEQ_API_URL": "http://localhost:12315",
+        "LOGSEQ_API_CONNECT_TIMEOUT": "10",
+        "LOGSEQ_API_READ_TIMEOUT": "60"
       }
     }
   }
@@ -93,6 +97,58 @@ Add to your config file (`Settings → Developer → Edit Config`):
 ```
 "Please help me organize my LogSeq notes. Show me what pages I have."
 ```
+
+### LogSeq 2.x DB Graphs
+
+For the LogSeq 2.0.1 DB version, set `LOGSEQ_DB_MODE=auto` or `true`. In `auto`
+mode the server asks LogSeq which graph format is active. DB-mode reads use
+LogSeq's native `logseq.cli.getPageData` and `logseq.app.search` APIs, while
+bulk edits use `logseq.cli.upsertNodes`. The LogSeq desktop application must be
+running with its HTTP API enabled and an API token configured.
+
+The legacy Markdown/file graph path remains available when detection returns
+false, or when `LOGSEQ_DB_MODE=false` is set explicitly. Do not point file-based vector sync at a DB graph: DB vector indexing
+reads page data through the API and requires `LOGSEQ_API_TOKEN` in the sync
+process environment.
+
+The MCP process maintains one reusable HTTP API client and connection pool for
+the configured LogSeq endpoint. Tool calls reuse that client session instead of
+opening a new HTTP session for every operation. A different endpoint, token,
+or graph mode creates a separate client configuration.
+
+### Deployment Examples
+
+#### Legacy File Graph
+
+Set `LOGSEQ_DB_MODE=false` to force file mode. The server uses Markdown pages and
+the file-graph `Editor.*` compatibility APIs:
+
+```bash
+LOGSEQ_API_TOKEN=your_token_here \
+LOGSEQ_API_URL=http://localhost:12315 \
+LOGSEQ_API_CONNECT_TIMEOUT=10 \
+LOGSEQ_API_READ_TIMEOUT=60 \
+mcp-logseq
+```
+
+#### LogSeq 2.0.1 DB Graph
+
+Set DB mode to `true` when you know the active graph is a DB graph. DB tools use
+UUIDs, typed properties, tags/classes, and the native `logseq.cli.*` APIs:
+
+```bash
+LOGSEQ_API_TOKEN=your_token_here \
+LOGSEQ_API_URL=http://localhost:12315 \
+LOGSEQ_DB_MODE=true \
+LOGSEQ_API_CONNECT_TIMEOUT=10 \
+LOGSEQ_API_READ_TIMEOUT=60 \
+mcp-logseq
+```
+
+Use `LOGSEQ_DB_MODE=auto` when the same deployment may open either graph type.
+Timeout values are seconds. Empty values such as `LOGSEQ_API_READ_TIMEOUT=""`
+fall back to the default 6-second read timeout; use a numeric value such as
+`60` for slower DB operations.
 
 ---
 
@@ -108,31 +164,110 @@ Use [Ollama](https://ollama.com) for fully local embeddings, OpenAI, or another 
 
 ## 🛠️ Available Tools
 
-The server provides 16 tools with intelligent markdown parsing, plus 3 optional vector search tools:
+The server provides 42 standard tools, grouped by graph type, plus 3 optional vector tools.
 
-| Tool | Purpose | Example Use |
-|------|---------|-------------|
-| **`list_pages`** | Browse your graph | "Show me all my pages" |
-| **`get_page_content`** | Read page content | "Get my project notes" |
-| **`create_page`** | Add new pages with structured blocks | "Create a meeting notes page with agenda items" |
-| **`update_page`** | Modify pages (append/replace modes) | "Update my task list" |
-| **`delete_page`** | Remove pages | "Delete the old draft page" |
-| **`delete_block`** | Remove a block by UUID | "Delete this specific block" |
-| **`update_block`** | Edit block content by UUID | "Update this specific block text" |
-| **`search`** | Find content across graph | "Search for 'productivity tips'" |
-| **`query`** | Execute Logseq DSL queries | "Find all TODO tasks tagged #project" |
-| **`find_pages_by_property`** | Search pages by property | "Find all pages with status = active" |
-| **`get_pages_from_namespace`** | List pages in a namespace | "Show all pages under Customer/" |
-| **`get_pages_tree_from_namespace`** | Hierarchical namespace view | "Show Projects/ as a tree" |
-| **`rename_page`** | Rename with reference updates | "Rename 'Old Name' to 'New Name'" |
-| **`get_page_backlinks`** | Find pages linking to a page | "What links to this page?" |
-| **`insert_nested_block`** | Insert child/sibling blocks | "Add a child block under this task" |
-| **`set_block_properties`** | Set DB-mode class properties on a block | "Set the status of this block to active" *(DB-mode only)* |
-| **`vector_search`** ⚗️ | Semantic search by meaning | "Find notes about shadow work or Jung" |
-| **`sync_vector_db`** ⚗️ | Sync vector DB with graph files | "Update the search index" |
-| **`vector_db_status`** ⚗️ | Show vector DB health and staleness | "Is my search index up to date?" |
+### File Graph Tools
+
+These tools support the original Markdown/file version of Logseq. They remain
+available as compatibility tools when working with file graphs.
+
+| Tool | Purpose |
+|------|---------|
+| **`list_pages`** | Browse pages |
+| **`get_page_content`** | Read page content |
+| **`create_page`** | Create pages with structured Markdown blocks |
+| **`update_page`** | Append or replace page content |
+| **`delete_page`** | Delete a page |
+| **`delete_block`** | Delete a block by UUID |
+| **`update_block`** | Update block content by UUID |
+| **`get_block`** | Read a block and its children |
+| **`search`** | Search graph content |
+| **`query`** | Execute Logseq DSL queries |
+| **`find_pages_by_property`** | Find pages by property |
+| **`get_pages_from_namespace`** | List pages in a namespace |
+| **`get_pages_tree_from_namespace`** | Show a namespace hierarchy |
+| **`rename_page`** | Rename a page and update references |
+| **`get_page_backlinks`** | Find pages linking to a page |
+| **`insert_nested_block`** | Insert child or sibling blocks |
+
+### DB Graph Tools
+
+These tools use Logseq 2.x DB APIs, UUIDs, typed properties, tags/classes, and
+DB node relationships. Enable them with `LOGSEQ_DB_MODE=true` or
+`LOGSEQ_DB_MODE=auto`.
+
+| Tool | Purpose |
+|------|---------|
+| **`upsert_nodes`** | Batch-create or edit pages, blocks, tags, and properties |
+| **`get_page_data`** | Read a DB page entity and block tree |
+| **`list_tags`** | List tags/classes |
+| **`list_properties`** | List typed property definitions |
+| **`search_blocks`** | Search DB blocks by content |
+| **`get_property`** | Read a property definition |
+| **`upsert_property`** | Create or update a typed property |
+| **`remove_property`** | Remove a property definition |
+| **`get_block_properties`** | Read all properties on a DB node |
+| **`get_block_property`** | Read one property from a DB node |
+| **`upsert_block_property`** | Set a typed property on a DB node |
+| **`remove_block_property`** | Remove a property from a DB node |
+| **`get_tag`** | Read a tag/class |
+| **`get_tag_objects`** | List nodes carrying a tag/class |
+| **`get_tags_by_name`** | Find tags by name |
+| **`create_tag`** | Create a tag/class |
+| **`add_block_tag`** | Add a tag to a DB node |
+| **`remove_block_tag`** | Remove a tag from a DB node |
+| **`list_nodes`** | List DB nodes with native options |
+| **`list_tasks`** | List task nodes |
+| **`list_assets`** | List asset nodes |
+| **`add_tag_property`** | Add a property to a tag/class |
+| **`remove_tag_property`** | Remove a property from a tag/class |
+| **`add_tag_extends`** | Add a parent class to a tag |
+| **`remove_tag_extends`** | Remove a parent class from a tag |
+| **`set_block_properties`** | Set DB class properties on a node |
+
+### Optional Vector Tools
+
+| Tool | Purpose |
+|------|---------|
+| **`vector_search`** ⚗️ | Semantic search by meaning |
+| **`sync_vector_db`** ⚗️ | Point to the external vector sync writer |
+| **`vector_db_status`** ⚗️ | Show vector DB health and staleness |
 
 ⚗️ *Requires vector search setup — see [VECTOR_SEARCH.md](VECTOR_SEARCH.md)*
+
+### Batch Changes in DB Mode
+
+The DB-mode `upsert_nodes` tool accepts an array of operations in one request.
+Logseq validates and applies that batch through its DB/outliner layer, so one
+call can create or edit several pages, blocks, tags, and properties without a
+separate round trip for every change. This is faster and keeps related changes
+together while avoiding partially stale results between individual requests.
+
+For example, a new page and a block on that page can be sent together by giving
+the page a temporary ID and referring to it from the block:
+
+```json
+{
+  "operations": [
+    {
+      "operation": "add",
+      "entityType": "page",
+      "id": "temp-inbox",
+      "data": {"title": "Inbox"}
+    },
+    {
+      "operation": "add",
+      "entityType": "block",
+      "data": {"page-id": "temp-inbox", "title": "Review proposal"}
+    }
+  ],
+  "dry_run": false
+}
+```
+
+Use `dry_run: true` to run Logseq's validation without committing changes.
+Prefer one well-formed batch per user request; use UUIDs for existing nodes and
+temporary IDs only for new nodes referenced by later operations.
 
 ### 🎨 Smart Markdown Parsing (v1.1.0+)
 
@@ -205,14 +340,17 @@ If you hit the "already exists" error mid-ingest, use `get_page_content` to see 
 ### Environment Variables
 - **`LOGSEQ_API_TOKEN`** (required): Your LogSeq API token
 - **`LOGSEQ_API_URL`** (optional): Server URL (default: `http://localhost:12315`)
+- **`LOGSEQ_VERIFY_SSL`** (optional): Set to `false` only for trusted development certificates; HTTPS verifies certificates by default
 - **`LOGSEQ_API_CONNECT_TIMEOUT`** (optional): HTTP connect timeout in seconds (default: `3`)
 - **`LOGSEQ_API_READ_TIMEOUT`** (optional): HTTP read timeout in seconds (default: `6`)
-- **`LOGSEQ_DB_MODE`** (optional): Set to `true` to enable DB-mode property support. Only for Logseq DB-mode graphs (beta). Markdown/file-based graph users should leave this unset.
+- **`LOGSEQ_DB_MODE`** (optional): Defaults to `auto` and detects the active graph. Set to `true` to force DB mode or `false` to force legacy Markdown/file mode.
 - **`LOGSEQ_EXCLUDE_TAGS`** (optional): Comma-separated tags — pages with these tags are hidden from all tools. See [Privacy & Access Control](#-privacy--access-control) below.
 - **`LOGSEQ_INCLUDE_NAMESPACES`** (optional): Comma-separated namespace allow-list (e.g. `work,projects`). When set, **only** pages in these namespaces and their sub-pages are accessible — everything else, including top-level pages without a namespace, is hidden from listings/search and denied on direct access. See [Privacy & Access Control](#-privacy--access-control) below.
 - **`LOGSEQ_EXCLUDE_NAMESPACES`** (optional): Comma-separated namespace deny-list (e.g. `finance,work/secret`). These namespaces are always blocked, taking priority over the include list. See [Privacy & Access Control](#-privacy--access-control) below.
 - **`LOGSEQ_CONFIG_FILE`** (optional): Path to a shared JSON config file holding the graph path, ACL defaults, and the `vector` block. Env vars (`LOGSEQ_EXCLUDE_TAGS`, `LOGSEQ_INCLUDE_NAMESPACES`, `LOGSEQ_EXCLUDE_NAMESPACES`) override the matching keys in this file.
 - **`MCP_HTTP_AUTH_TOKEN`** (required for `--transport http`): Bearer token clients must send as `Authorization: Bearer <token>`. The server refuses to start in HTTP mode without it. See [Serving over HTTP](docs/SERVING.md).
+
+For deployments where the assistant must not modify LogSeq, start the server with `--read-only`. This removes all page and block write tools while leaving read, search, and configured vector tools available. For remote HTTP deployments, use HTTPS or a TLS-terminating reverse proxy; plain HTTP is restricted to loopback unless `--insecure` is explicitly supplied.
 
 ### Privacy & Access Control
 

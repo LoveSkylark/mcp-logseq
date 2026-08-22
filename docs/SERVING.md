@@ -26,7 +26,7 @@ mcp-logseq --transport http --host 127.0.0.1 --port 12320
 - `--transport {stdio,http}` — default `stdio`.
 - `--host` — default `127.0.0.1` (loopback). Binding a non-loopback host over plain HTTP is **refused** unless you supply TLS or pass `--insecure`; see [Step 3 — encrypt anything past loopback](#step-3--encrypt-anything-past-loopback).
 - `--port` — default `12320`.
-- `--read-only` — unregisters the 8 write tools (see [Security model](#-security-model)); read tools and the vector tools remain.
+- `--read-only` — unregisters the 9 write tools (see [Security model](#-security-model)); read tools and the vector tools remain.
 - `--tls-cert` / `--tls-key` — serve native HTTPS; see [Step 3](#step-3--encrypt-anything-past-loopback).
 
 HTTP mode **requires** `MCP_HTTP_AUTH_TOKEN`; the server exits if it is missing. Clients authenticate with `Authorization: Bearer <token>` and target the MCP endpoint at **`/mcp`**. (A bare POST to `/mcp` issues a `307` redirect to `/mcp/`; point clients at `/mcp` and follow redirects, or use `/mcp/` directly.)
@@ -58,6 +58,29 @@ mcp-logseq --transport http --port 12322
 ```
 
 The `LOGSEQ_CONFIG_FILE` is identical across all three instances; the per-process env block is what makes each one a distinct profile. Because each instance is its own process, one profile's env (token, namespace scope, excluded tags) is never loaded by another — isolation is the process boundary.
+
+### File and DB graph deployment
+
+For a legacy file graph, set `LOGSEQ_DB_MODE=false`. For a Logseq 2.0.1 DB
+graph, set `LOGSEQ_DB_MODE=true`; `auto` is the default when the active graph
+type may vary. Both deployments use the same MCP transport and API token, but DB
+mode routes page/search/list operations through Logseq's native DB APIs.
+
+Long-running DB operations should use numeric timeout values in seconds:
+
+```bash
+# File graph
+LOGSEQ_API_CONNECT_TIMEOUT=10 LOGSEQ_API_READ_TIMEOUT=60 \
+mcp-logseq --transport http --port 12320
+
+# Logseq 2.0.1 DB graph
+LOGSEQ_DB_MODE=true LOGSEQ_API_CONNECT_TIMEOUT=10 LOGSEQ_API_READ_TIMEOUT=60 \
+mcp-logseq --transport http --port 12320
+```
+
+An empty timeout variable uses the application default; it does not mean
+unlimited time. Set `LOGSEQ_API_READ_TIMEOUT` to a number such as `60` when
+commands can take longer than six seconds.
 
 ### Step 2 — the separate sync writer
 

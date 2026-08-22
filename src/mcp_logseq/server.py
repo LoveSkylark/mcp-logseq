@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import sys
 from collections.abc import Sequence
@@ -22,6 +23,8 @@ logging.basicConfig(
 logger = logging.getLogger("mcp-logseq")
 
 # Add a file handler to keep logs (in user's home directory to avoid permission issues)
+import tempfile
+
 log_dir = os.path.expanduser("~/.cache/mcp-logseq")
 os.makedirs(log_dir, exist_ok=True)
 log_file = os.path.join(log_dir, "mcp_logseq.log")
@@ -38,7 +41,10 @@ except Exception as e:
 load_dotenv()
 
 from . import tools
-from .settings import get_settings
+
+# Load environment variables with more verbose logging
+api_url = os.getenv("LOGSEQ_API_URL", "http://localhost:12315")
+logger.info(f"Using API URL: {api_url}")
 
 # Names of the genuine write tools — tools that mutate Logseq content. When
 # ``read_only`` is set these are NOT registered. ``sync_vector_db`` is NOT in
@@ -54,6 +60,16 @@ _WRITE_TOOL_NAMES = frozenset(
         "delete_block",
         "insert_nested_block",
         "set_block_properties",
+        "upsert_nodes",
+        "upsert_property",
+        "remove_property",
+        "upsert_block_property",
+        "remove_block_property",
+        "create_tag",
+        "add_block_tag",
+        "remove_block_tag",
+        "remove_tag_property",
+        "remove_tag_extends",
     }
 )
 
@@ -79,6 +95,31 @@ def _register_all_tool_handlers(handlers: dict, read_only: bool = False) -> None
 
     logger.info(f"Registering tool handlers (read_only={read_only})...")
 
+    add(tools.UpsertNodesToolHandler())
+    add(tools.GetPageDataToolHandler())
+    add(tools.ListTagsToolHandler())
+    add(tools.ListPropertiesToolHandler())
+    add(tools.SearchBlocksToolHandler())
+    add(tools.GetPropertyToolHandler())
+    add(tools.UpsertPropertyToolHandler())
+    add(tools.RemovePropertyToolHandler())
+    add(tools.GetBlockPropertiesToolHandler())
+    add(tools.GetBlockPropertyToolHandler())
+    add(tools.UpsertBlockPropertyToolHandler())
+    add(tools.RemoveBlockPropertyToolHandler())
+    add(tools.GetTagToolHandler())
+    add(tools.GetTagObjectsToolHandler())
+    add(tools.GetTagsByNameToolHandler())
+    add(tools.CreateTagToolHandler())
+    add(tools.AddBlockTagToolHandler())
+    add(tools.RemoveBlockTagToolHandler())
+    add(tools.ListNodesToolHandler())
+    add(tools.ListTasksToolHandler())
+    add(tools.ListAssetsToolHandler())
+    add(tools.AddTagPropertyToolHandler())
+    add(tools.RemoveTagPropertyToolHandler())
+    add(tools.AddTagExtendsToolHandler())
+    add(tools.RemoveTagExtendsToolHandler())
     add(tools.CreatePageToolHandler())
     add(tools.UpdatePageToolHandler())
     add(tools.ListPagesToolHandler())
@@ -101,11 +142,10 @@ def _register_all_tool_handlers(handlers: dict, read_only: bool = False) -> None
     # Conditional vector tool registration — only when LOGSEQ_CONFIG_FILE is set
     # and vector.enabled is true in the config file
     try:
-        from .access import get_access_config
-        from .config import load_vector_config
+        from .config import load_vector_config, load_exclude_tags
         vector_config = load_vector_config()
         # Merge top-level exclude_tags into vector config (additive union)
-        top_level_exclude = get_access_config().exclude_tags
+        top_level_exclude = load_exclude_tags()
         if vector_config and top_level_exclude:
             merged = list(dict.fromkeys(top_level_exclude + vector_config.exclude_tags))
             vector_config.exclude_tags = merged
@@ -207,9 +247,6 @@ def get_tool_handler(name: str) -> tools.ToolHandler | None:
 
 async def main(read_only: bool = False):
     logger.info(f"Starting LogSeq MCP server (read_only={read_only})")
-    # Fail fast at startup (not import time) if configuration is invalid.
-    settings = get_settings()
-    logger.info(f"Using LogSeq API at {settings.protocol}://{settings.host}:{settings.port}")
     from mcp.server.stdio import stdio_server
 
     app, _ = build_app(read_only=read_only)

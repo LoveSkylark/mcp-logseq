@@ -46,6 +46,15 @@ class TestToolConfiguration:
 
         assert mock_logseq_class.call_args.kwargs["timeout"] == (2.5, 15.0)
 
+    @patch.dict("os.environ", {"LOGSEQ_API_TOKEN": "test_token"})
+    @patch("mcp_logseq.tools.logseq.LogSeq")
+    def test_make_api_reuses_one_client_session(self, mock_logseq_class):
+        first = tools._make_api()
+        second = tools._make_api()
+
+        assert first is second
+        mock_logseq_class.assert_called_once()
+
 
 class TestCreatePageToolHandler:
     """Test cases for the new CreatePageToolHandler with block parsing."""
@@ -1914,3 +1923,46 @@ class TestGetBlockToolHandler:
         assert "Failed to get block 'abc-123'" in result[0].text
         assert "Unexpected API failure" in result[0].text
         assert "Failed to get block" in caplog.text
+
+
+class TestDbUpsertValidation:
+    @patch("mcp_logseq.tools._get_db_mode", return_value=True)
+    def test_rejects_invalid_operation_type(self, _db_mode):
+        from mcp_logseq.tools import UpsertNodesToolHandler
+
+        result = UpsertNodesToolHandler().run_tool({
+            "operations": [{"operation": "remove", "entityType": "block", "data": {}}]
+        })
+
+        assert "invalid operation" in result[0].text
+
+    @patch("mcp_logseq.tools._get_db_mode", return_value=True)
+    def test_rejects_block_without_page_id(self, _db_mode):
+        from mcp_logseq.tools import UpsertNodesToolHandler
+
+        result = UpsertNodesToolHandler().run_tool({
+            "operations": [{
+                "operation": "add",
+                "entityType": "block",
+                "data": {"title": "orphan"},
+            }]
+        })
+
+        assert "requires page-id" in result[0].text
+
+    @patch.dict("os.environ", {"LOGSEQ_API_TOKEN": "test_token"})
+    @patch("mcp_logseq.tools._get_db_mode", return_value=True)
+    @patch("mcp_logseq.tools.logseq.LogSeq")
+    def test_accepts_page_and_block_batch(self, mock_logseq_class, _db_mode):
+        from mcp_logseq.tools import UpsertNodesToolHandler
+
+        mock_logseq_class.return_value.upsert_nodes.return_value = "Added: 2."
+        result = UpsertNodesToolHandler().run_tool({
+            "operations": [
+                {"operation": "add", "entityType": "page", "id": "temp", "data": {"title": "Inbox"}},
+                {"operation": "add", "entityType": "block", "data": {"page-id": "temp", "title": "Task"}},
+            ]
+        })
+
+        assert "COMMITTED" in result[0].text
+        mock_logseq_class.return_value.upsert_nodes.assert_called_once()

@@ -7,14 +7,17 @@ Incrementally syncs .md files from the Logseq graph directory into LanceDB.
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import os
 import shutil
 import time
 from pathlib import Path
+from urllib.parse import urlparse
 
 from mcp_logseq.config import VectorConfig
-from mcp_logseq.vector.chunker import chunk_file
+from mcp_logseq.logseq import LogSeq
+from mcp_logseq.vector.chunker import chunk_db_page, chunk_file
 from mcp_logseq.vector.db import VectorDB
 from mcp_logseq.vector.embedder import Embedder
 from mcp_logseq.vector.state import StateManager, now_iso
@@ -102,6 +105,9 @@ class SyncEngine:
                 f"{self._embedder.dimensions}. Run logseq-sync --rebuild to "
                 f"re-index from scratch."
             )
+
+        if self._config.db_mode:
+            return self._sync_db(state, meta, start)
 
         # Guard: if graph path is inaccessible (e.g. container without vault mounted),
         # abort rather than interpreting all state entries as deleted and wiping the DB.
@@ -210,6 +216,112 @@ class SyncEngine:
         for chunk, vector in zip(chunks, vectors):
             chunk.vector = vector
 
+    def _sync_db(
+        self, state: SyncState, meta: SyncMeta, start: float
+    ) -> SyncResult:
+        """Sync DB-graph page data through Logseq 2.x's API surface."""
+        api_token = os.getenv("LOGSEQ_API_TOKEN", "")
+        if not api_token:
+            raise RuntimeError("LOGSEQ_API_TOKEN is required for DB graph vector sync")
+
+        api_url = os.getenv("LOGSEQ_API_URL", "http://localhost:12315")
+        parsed_url = urlparse(api_url)
+        api = LogSeq(
+            api_key=api_token,
+            protocol=parsed_url.scheme or "http",
+            host=parsed_url.hostname or "127.0.0.1",
+            port=parsed_url.port or 12315,
+            verify_ssl=(parsed_url.scheme or "http") == "https",
+            timeout=(3, 6),
+            db_mode=True,
+        )
+
+        if self._config.db_mode == "auto":
+            api.db_mode = api.check_current_is_db_graph()
+
+        try:
+            pages = api.list_pages()
+            if not isinstance(pages, list):
+                raise RuntimeError("Logseq returned an invalid DB page list")
+
+            current_keys: set[str] = set()
+            added = updated = skipped = deleted = 0
+            for page in pages:
+                if not isinstance(page, dict):
+                    continue
+                page_name = str(
+                    page.get("block/title")
+                    or page.get("block/name")
+                    or page.get("originalName")
+                    or page.get("name")
+                    or ""
+                )
+                page_id = page.get("block/uuid") or page.get("uuid") or page_name
+                if not page_name or not page_id:
+                    continue
+
+                state_key = f"db:{page_id}"
+                current_keys.add(state_key)
+                page_data = api.get_page_data(str(page_id))
+                if not isinstance(page_data, dict) or not page_data.get("entity"):
+                    raise RuntimeError(f"Logseq returned no page data for '{page_name}'")
+                content_hash = hashlib.sha256(
+                    json.dumps(page_data, sort_keys=True, default=str).encode("utf-8")
+                ).hexdigest()
+                existing = state.get(state_key)
+                if existing and existing.content_hash == content_hash:
+                    skipped += 1
+                    continue
+
+                chunks = chunk_db_page(page_data, self._config)
+                if chunks:
+                    self._embed_chunks_batched(chunks)
+                    if any(chunk.vector is None for chunk in chunks):
+                        logger.warning(
+                            "Embedding failed for DB page '%s'; preserving previous index state",
+                            page_name,
+                        )
+                        continue
+
+                if existing:
+                    self._db.delete_by_ids(existing.chunk_ids)
+                    updated += 1
+                else:
+                    added += 1
+                if chunks:
+                    self._db.upsert(chunks)
+                state[state_key] = FileState(
+                    content_hash=content_hash,
+                    last_synced=now_iso(),
+                    chunk_ids=[chunk.id for chunk in chunks],
+                )
+
+            for state_key in set(state) - current_keys:
+                if not state_key.startswith("db:"):
+                    continue
+                self._db.delete_by_ids(state[state_key].chunk_ids)
+                del state[state_key]
+                deleted += 1
+
+            if added or updated or deleted:
+                self._db.create_fts_index()
+            meta = SyncMeta(
+                embedder_key=self._embedder.key,
+                dimensions=self._embedder.dimensions,
+                last_full_sync=now_iso(),
+            )
+            self._state_mgr.save(state, meta)
+            duration_ms = int((time.monotonic() - start) * 1000)
+            return SyncResult(
+                added=added,
+                updated=updated,
+                deleted=deleted,
+                skipped=skipped,
+                duration_ms=duration_ms,
+            )
+        finally:
+            api._session.close()
+
     def _rebuild_db(self) -> None:
         logger.info("Rebuild requested — dropping existing DB and state")
         db_path = Path(self._config.db_path)
@@ -219,7 +331,9 @@ class SyncEngine:
         os.makedirs(db_path, exist_ok=True)
 
 
-def check_staleness(graph_dir: str, state: SyncState) -> StalenessReport:
+def check_staleness(
+    graph_dir: str, state: SyncState, db_mode: bool = False
+) -> StalenessReport:
     """
     Fast staleness check — hashes files only, no DB or network calls.
     Returns a StalenessReport indicating how many files have changed since last sync.
@@ -228,6 +342,15 @@ def check_staleness(graph_dir: str, state: SyncState) -> StalenessReport:
     volume is not mounted), returns stale=False to avoid triggering a sync that would
     incorrectly interpret all state entries as deleted and wipe the DB.
     """
+    if db_mode:
+        synced_times = [fs.last_synced for fs in state.values() if fs.last_synced]
+        return StalenessReport(
+            stale=False,
+            changed_count=0,
+            deleted_count=0,
+            last_sync=max(synced_times) if synced_times else None,
+        )
+
     if not Path(graph_dir).exists():
         return StalenessReport(stale=False, changed_count=0, deleted_count=0, last_sync=None)
 

@@ -66,6 +66,7 @@ class VectorConfig:
     exclude_tags: list[str] = field(default_factory=list)
     include_namespaces: list[str] = field(default_factory=list)
     exclude_namespaces: list[str] = field(default_factory=list)
+    db_mode: bool | str = False
     min_chunk_length: int = 50
     watch_debounce_ms: int = 5000
 
@@ -173,6 +174,11 @@ def load_vector_config() -> VectorConfig | None:
 
     db_path = os.path.expanduser(vector_raw.get("db_path", "~/.logseq-vector"))
 
+    db_mode_setting = os.getenv("LOGSEQ_DB_MODE", "auto").lower()
+    db_mode = "auto" if db_mode_setting in ("", "auto") else db_mode_setting in (
+        "1", "true", "yes"
+    )
+
     return VectorConfig(
         enabled=True,
         db_path=db_path,
@@ -182,6 +188,7 @@ def load_vector_config() -> VectorConfig | None:
         exclude_tags=vector_raw.get("exclude_tags", []),
         include_namespaces=vector_raw.get("include_namespaces", []),
         exclude_namespaces=vector_raw.get("exclude_namespaces", []),
+        db_mode=db_mode,
         min_chunk_length=vector_raw.get("min_chunk_length", 50),
         watch_debounce_ms=vector_raw.get("watch_debounce_ms", 5000),
     )

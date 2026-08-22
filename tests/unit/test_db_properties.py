@@ -364,6 +364,7 @@ class TestFeatureFlagIntegration:
     """Tests that LOGSEQ_DB_MODE correctly gates DB-mode API calls."""
 
     @responses.activate
+    @patch.dict("os.environ", {"LOGSEQ_DB_MODE": "false"})
     def test_get_page_content_skips_db_queries_without_flag(self):
         """get_page_content does NOT call get_blocks_db_properties when flag is off."""
         api_url = "http://localhost:12315/api"
@@ -636,6 +637,7 @@ class TestGetPageContentResolveRefs:
     """Tests for resolve_refs integration in get_page_content tool."""
 
     @responses.activate
+    @patch.dict("os.environ", {"LOGSEQ_DB_MODE": "true"})
     def test_resolve_refs_enabled_in_db_mode(self):
         """UUID refs are resolved when LOGSEQ_DB_MODE is on and resolve_refs is true."""
         api_url = "http://localhost:12315/api"
@@ -664,6 +666,7 @@ class TestGetPageContentResolveRefs:
         assert "aaaa1111" not in result[0].text
 
     @patch.dict("os.environ", {"LOGSEQ_API_TOKEN": "test_token"})
+    @patch.dict("os.environ", {"LOGSEQ_DB_MODE": "true"})
     @patch("mcp_logseq.tools.logseq.LogSeq")
     def test_resolve_refs_disabled(self, mock_logseq_class):
         """UUID refs are NOT resolved when resolve_refs=false."""
@@ -688,6 +691,7 @@ class TestGetPageContentResolveRefs:
         mock_api.resolve_page_uuids.assert_not_called()
 
     @responses.activate
+    @patch.dict("os.environ", {"LOGSEQ_DB_MODE": "false"})
     def test_resolve_refs_skipped_in_markdown_mode(self):
         """No UUID resolution in markdown mode."""
         api_url = "http://localhost:12315/api"
@@ -710,6 +714,7 @@ class TestGetPageContentResolveRefs:
         assert len(responses.calls) == 2
 
     @responses.activate
+    @patch.dict("os.environ", {"LOGSEQ_DB_MODE": "true"})
     def test_json_format_includes_resolved_refs(self):
         """JSON format includes resolved_refs mapping in DB mode."""
         api_url = "http://localhost:12315/api"

@@ -6,6 +6,42 @@ This document describes the LogSeq HTTP API architecture based on source code an
 
 The LogSeq HTTP API runs on `localhost:12315` (default) and acts as a proxy to LogSeq's internal plugin API methods. It bridges external applications to LogSeq's core functionality through JSON-RPC calls.
 
+## Logseq 2.x DB Graph API
+
+Logseq 2.0.1 introduces DB graphs and a native Streamable HTTP MCP server at
+`/mcp`. Its MCP implementation delegates to DB-aware API methods exposed
+through the same authenticated `/api` endpoint:
+
+- `logseq.cli.getPageData(pageNameOrUuid)` returns a page entity and its block tree.
+- `logseq.cli.listPages(options)` lists DB pages with UUIDs and optional expanded data.
+- `logseq.cli.listTags(options)` lists tags and optional tag metadata.
+- `logseq.cli.listProperties(options)` lists property definitions and schemas.
+- `logseq.app.search(searchTerm, options)` searches DB node content.
+- `logseq.cli.upsertNodes(operations, options)` validates and applies batched page, block, tag, and property operations; `dry-run` performs validation without committing.
+
+`upsertNodes` is the DB graph batch boundary: the client sends an operations
+array once, and Logseq's DB/outliner layer resolves the related operations and
+applies the resulting graph changes together. A temporary ID can name a new
+page or node so later operations in the same array can reference it. This
+reduces HTTP round trips and avoids making each dependent change wait for a
+separate response. `dry-run` exercises validation without committing.
+
+DB pages and blocks are nodes identified by UUID and/or numeric `db/id` values.
+Properties are typed and may be inherited from tags, so DB clients must preserve
+namespaced fields such as `block/title`, `block/uuid`, `block/tags`, and
+`logseq.property/*` rather than treating properties as Markdown `key:: value`
+lines.
+
+This project supports both modes. `LOGSEQ_DB_MODE=auto` is the default and asks
+Logseq which graph type is active. Set it to `true` to force the DB API adapter
+or `false` to force legacy Markdown/file behavior, where page files and the
+Markdown parser remain the source of truth.
+
+The Python MCP process reuses one `requests.Session` for all calls made through
+the same configured Logseq endpoint, token, timeout, and graph mode. This is a
+process-local connection pool; separate MCP processes or different endpoint
+configurations use separate sessions.
+
 ## API Endpoint
 
 - **Base URL**: `http://localhost:12315`
@@ -74,7 +110,11 @@ Standard JSON-RPC response with result or error.
   - Returns hierarchical block structure for page
   - Each block includes: content, properties, children, etc.
 
-#### 🔍 Likely Available (Unverified)
+#### Legacy file-graph operations
+
+These operations remain supported by the compatibility adapter for file graphs.
+They are not the preferred bulk-operation path for DB graphs.
+
 - **`deletePage(pageName)`** - Delete page entirely
 - **`updatePage(pageName, properties)`** - Update page properties
 - **`updateBlock(blockUUID, content)`** - Update specific block content
@@ -85,8 +125,9 @@ Standard JSON-RPC response with result or error.
 - **`getGraphs()`** - List available graphs (potentially)
 
 ### Properties Namespace
-- **`getPageProperties(pageName)`** - Get page properties (may not exist in all versions)
-- **`setPageProperties(pageName, properties)`** - Set page properties
+- File graphs use first-block property operations for compatibility.
+- DB graphs use typed properties through `logseq.cli.upsertNodes` and expose
+  property definitions through `logseq.cli.listProperties`.
 
 ## Authentication
 
@@ -120,12 +161,9 @@ Generated in LogSeq Settings → Features → HTTP APIs server
 ## Limitations
 
 ### Search Functionality
-- No direct search endpoints available
-- Would require expensive page-by-page iteration:
-  1. Get all pages via `getAllPages()`
-  2. Get content for each via `getPageBlocksTree()`  
-  3. Search content client-side
-- **Recommendation**: Avoid implementing search through HTTP API
+- Legacy file graphs use `logseq.App.search`.
+- DB graphs use `logseq.app.search`, the lowercase API used by Logseq's native MCP server.
+- Search results may contain DB node fields and UUIDs rather than file/page-only records.
 
 ### Plugin API Boundary
 - HTTP API limited to methods exposed to plugin system
@@ -146,10 +184,9 @@ Generated in LogSeq Settings → Features → HTTP APIs server
 ## Implementation Notes
 
 ### Content Retrieval Strategy
-For complete page content, combine multiple API calls:
-1. `getPage(pageName)` - Get page metadata
-2. `getPageBlocksTree(pageName)` - Get content blocks
-3. `getPageProperties(pageName)` - Get properties (if available)
+- Legacy file graphs combine `getPage(pageName)` and `getPageBlocksTree(pageName)`.
+- DB graphs should use `logseq.cli.getPageData(pageNameOrUuid)`, which returns the
+  page entity and its block tree in one DB-aware response.
 
 ### Block Structure
 Blocks returned by `getPageBlocksTree()` can be:

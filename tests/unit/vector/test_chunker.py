@@ -8,6 +8,7 @@ from mcp_logseq.vector.chunker import (
     _clean_for_embedding,
     _detect_journal_date,
     _flatten_block,
+    chunk_db_page,
     chunk_file,
 )
 
@@ -191,3 +192,47 @@ def test_chunk_file_missing_file(tmp_path):
 
     chunks = chunk_file(missing, config)
     assert chunks == []
+
+
+def test_chunk_db_page_uses_namespaced_fields_and_uuid_ids():
+    config = _make_config(min_chunk_length=10)
+    page_data = {
+        "entity": {
+            "block/title": "Work/Project",
+            "block/uuid": "page-uuid",
+            "block/tags": [{"block/title": "Project"}],
+            "logseq.property/status": "Active",
+        },
+        "blocks": [
+            {
+                "block/title": "A DB block with enough content",
+                "block/uuid": "block-uuid",
+                "block/children": [
+                    {"block/title": "A nested DB block"},
+                ],
+            }
+        ],
+    }
+
+    chunks = chunk_db_page(page_data, config)
+
+    assert len(chunks) == 1
+    assert chunks[0].id == "Work/Project::block-uuid"
+    assert chunks[0].page == "Work/Project"
+    assert "A nested DB block" in chunks[0].text
+    assert chunks[0].tags == ["Project"]
+
+
+def test_chunk_db_page_applies_namespace_and_tag_filters():
+    page_data = {
+        "entity": {
+            "block/title": "Private/Project",
+            "block/tags": [{"block/title": "secret"}],
+        },
+        "blocks": [{"block/title": "Enough DB content to index"}],
+    }
+
+    assert chunk_db_page(
+        page_data, _make_config(exclude_namespaces=["Private"])
+    ) == []
+    assert chunk_db_page(page_data, _make_config(exclude_tags=["secret"])) == []

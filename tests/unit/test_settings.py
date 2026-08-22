@@ -60,7 +60,7 @@ class TestLoadSettings:
         assert s.port == 12315
         assert s.verify_ssl is False  # plain http → no TLS verification
         assert s.timeout == (3, 6)
-        assert s.db_mode is False
+        assert s.db_mode == "auto"
 
     def test_api_url_parsed(self, clean_env):
         clean_env.setenv("LOGSEQ_API_TOKEN", "tok")

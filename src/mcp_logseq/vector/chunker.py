@@ -190,3 +190,80 @@ def chunk_file(file_path: Path, config: VectorConfig) -> list[LogseqChunk]:
         ))
 
     return chunks
+
+
+def _db_block_text(block: dict) -> str:
+    return str(block.get("block/title") or block.get("content") or "").strip()
+
+
+def _flatten_db_block(block: dict) -> str:
+    parts = [_db_block_text(block)]
+    children = block.get("block/children", block.get("children", [])) or []
+    for child in children:
+        if isinstance(child, dict):
+            parts.append(_flatten_db_block(child))
+    return "\n".join(part for part in parts if part)
+
+
+def _db_tags(entity: dict) -> list[str]:
+    raw_tags = entity.get("block/tags", entity.get("tags", [])) or []
+    tags: list[str] = []
+    for tag in raw_tags if isinstance(raw_tags, list) else [raw_tags]:
+        if isinstance(tag, dict):
+            value = tag.get("block/title") or tag.get("block/name") or tag.get("title")
+        else:
+            value = tag
+        if value:
+            tags.append(str(value))
+    return tags
+
+
+def chunk_db_page(page_data: dict, config: VectorConfig) -> list[LogseqChunk]:
+    """Convert Logseq 2.x ``getPageData`` output into vector chunks."""
+    entity = page_data.get("entity") or page_data.get("page") or {}
+    if not isinstance(entity, dict):
+        return []
+    page_title = str(
+        entity.get("block/title")
+        or entity.get("block/name")
+        or entity.get("title")
+        or entity.get("name")
+        or ""
+    )
+    if not page_title:
+        return []
+
+    tags = _db_tags(entity)
+    if config.exclude_tags and any(tag in config.exclude_tags for tag in tags):
+        return []
+    if is_namespace_blocked(
+        page_title, config.include_namespaces, config.exclude_namespaces
+    ):
+        return []
+
+    properties = {
+        str(key): value
+        for key, value in entity.items()
+        if isinstance(key, str) and (key.startswith("logseq.property/") or key in {"properties", "tags"})
+    }
+    properties_json = json.dumps(properties, default=str)
+    chunks: list[LogseqChunk] = []
+    for index, block in enumerate(page_data.get("blocks", []) or []):
+        if not isinstance(block, dict):
+            continue
+        raw = _flatten_db_block(block)
+        text = _clean_for_embedding(raw)
+        if len(text) < config.min_chunk_length:
+            continue
+        block_uuid = str(block.get("block/uuid") or block.get("uuid") or f"{index}")
+        chunks.append(LogseqChunk(
+            id=f"{page_title}::{block_uuid}",
+            page=page_title,
+            text=text,
+            raw=raw,
+            tags=tags,
+            date=None,
+            properties=properties_json,
+            block_index=index,
+        ))
+    return chunks

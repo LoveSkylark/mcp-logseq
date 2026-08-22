@@ -49,8 +49,9 @@ class TestMCPServerIntegration:
 
     def test_list_tools_handler_count(self):
         """Test that we have the expected number of tool handlers."""
-        # We should have 17 registered tool handlers
-        assert len(tool_handlers) == 17
+        # DB-mode adds native search, node listings, typed properties, tags,
+        # relationships, page data, and bulk upsert handlers.
+        assert len(tool_handlers) == 42
 
         # Verify core tool names are present
         core_tools = [

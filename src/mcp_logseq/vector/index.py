@@ -195,7 +195,11 @@ class VectorSearchToolHandler(ToolHandler):
         # Staleness check — informational only, no writes
         output_prefix = ""
         try:
-            report = check_staleness(self._config.graph_path, state)
+            report = check_staleness(
+                self._config.graph_path,
+                state,
+                db_mode=getattr(self._config, "db_mode", False) in (True, "auto"),
+            )
             if report.stale:
                 parts = []
                 if report.changed_count:

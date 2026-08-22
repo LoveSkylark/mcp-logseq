@@ -202,6 +202,23 @@ def test_loads_valid_config(monkeypatch, tmp_path):
     assert config.embedder.model == "nomic-embed-text"
 
 
+def test_loads_db_mode_from_environment(monkeypatch, tmp_path):
+    path = _write_config(tmp_path, {
+        "logseq_graph_path": "/my/db-graph",
+        "vector": {
+            "enabled": True,
+            "embedder": {"provider": "ollama", "model": "nomic-embed-text"},
+        },
+    })
+    monkeypatch.setenv("LOGSEQ_CONFIG_FILE", path)
+    monkeypatch.setenv("LOGSEQ_DB_MODE", "true")
+
+    config = load_vector_config()
+
+    assert config is not None
+    assert config.db_mode is True
+
+
 def test_loads_index_time_namespaces(monkeypatch, tmp_path):
     path = _write_config(tmp_path, {
         "logseq_graph_path": "/my/graph/pages",
