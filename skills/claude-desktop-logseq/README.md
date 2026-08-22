@@ -14,7 +14,7 @@ at least:
   "mcpServers": {
     "logseq": {
       "command": "/absolute/path/to/uvx",
-      "args": ["--with", "mcp-logseq", "mcp-logseq"],
+      "args": ["--with", "mcp>=2,<3", "mcp-logseq"],
       "env": {
         "LOGSEQ_API_TOKEN": "your-logseq-api-token",
         "LOGSEQ_DB_MODE": "auto",

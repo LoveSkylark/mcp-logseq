@@ -11,6 +11,8 @@ from mcp.types import (
     TextContent,
     ImageContent,
     EmbeddedResource,
+    CallToolResult,
+    ListToolsResult,
 )
 
 # Configure logging to stderr with more verbose output
@@ -168,23 +170,20 @@ def build_app(read_only: bool = False) -> tuple[Server, dict]:
     including ``sync_vector_db``). Default ``read_only=False`` registers
     everything, identical to prior behavior.
     """
-    server = Server("mcp-logseq")
     handlers: dict = {}
     _register_all_tool_handlers(handlers, read_only)
 
-    @server.list_tools()
-    async def list_tools() -> list[Tool]:
+    async def list_tools(_context, _params) -> ListToolsResult:
         """List available tools."""
         logger.debug("Listing tools")
         tools_list = [th.get_tool_description() for th in handlers.values()]
         logger.debug(f"Found {len(tools_list)} tools")
-        return tools_list
+        return ListToolsResult(tools=tools_list)
 
-    @server.call_tool()
-    async def call_tool(
-        name: str, arguments: Any
-    ) -> Sequence[TextContent | ImageContent | EmbeddedResource]:
+    async def call_tool(_context, request) -> CallToolResult:
         """Handle tool calls."""
+        name = request.name
+        arguments = request.arguments or {}
         logger.info(f"Tool call: {name} with arguments {arguments}")
 
         if not isinstance(arguments, dict):
@@ -200,10 +199,20 @@ def build_app(read_only: bool = False) -> tuple[Server, dict]:
             logger.debug(f"Running tool {name}")
             result = await asyncio.to_thread(tool_handler.run_tool, arguments)
             logger.debug(f"Tool result: {result}")
-            return result
+            return CallToolResult(content=result)
         except Exception as e:
             logger.error(f"Error running tool: {str(e)}", exc_info=True)
-            raise RuntimeError(f"Error: {str(e)}")
+            return CallToolResult(
+                content=[TextContent(type="text", text=f"Error: {str(e)}")],
+                isError=True,
+            )
+
+    server = Server(
+        "mcp-logseq",
+        version="1.8.0",
+        on_list_tools=list_tools,
+        on_call_tool=call_tool,
+    )
 
     return server, handlers
 

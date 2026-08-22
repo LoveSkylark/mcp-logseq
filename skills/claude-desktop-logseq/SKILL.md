@@ -229,7 +229,7 @@ Or open it from inside the app: **Settings → Developer → Edit Config**.
   "mcpServers": {
     "logseq": {
       "command": "C:\\Users\\YOU\\.local\\bin\\uvx.exe",
-      "args": ["--with", "mcp<1.10", "mcp-logseq"],
+      "args": ["--with", "mcp>=2,<3", "mcp-logseq"],
       "env": {
         "LOGSEQ_API_TOKEN": "your-token",
         "LOGSEQ_API_URL": "http://127.0.0.1:12315",
@@ -251,7 +251,8 @@ Notes on each setting:
   a high value only makes failures slow.
 - `PYTHONIOENCODING=utf-8` — prevents a `UnicodeEncodeError` crash when the server writes
   its ❌ emoji into a Windows cp1252 console stream.
-- `--with mcp<1.10` — pins the MCP SDK the package expects.
+- `--with mcp>=2,<3` — pins the MCP 2.x SDK used by this package. The server
+  registers `on_list_tools` and `on_call_tool` callbacks through the MCP 2 API.
 
 **Quit Claude Desktop completely from the system tray before editing this file.** The app
 holds config in memory and rewrites it on exit, silently discarding edits made while it is

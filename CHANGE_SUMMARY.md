@@ -13,6 +13,7 @@
 - Added typed DB property access and tag/class relationship operations.
 - Added read-only server mode, which hides content-changing tools while keeping read and search tools available.
 - Added asynchronous thread offloading so synchronous API calls do not block the MCP event loop.
+- Migrated server registration and tool results to the MCP 2.x callback API.
 - Kept vector search, vector status, and external vector-sync tools available when vector support is configured.
 
 ## Deployment Notes

@@ -68,10 +68,10 @@ class TestCreatePageToolHandler:
         assert tool.description is not None
         assert "Create a new page in Logseq" in tool.description
         # New handler only requires title
-        assert tool.inputSchema["required"] == ["title"]
+        assert tool.input_schema["required"] == ["title"]
         # Should have content, properties as optional
-        assert "content" in tool.inputSchema["properties"]
-        assert "properties" in tool.inputSchema["properties"]
+        assert "content" in tool.input_schema["properties"]
+        assert "properties" in tool.input_schema["properties"]
 
     @patch.dict("os.environ", {"LOGSEQ_API_TOKEN": "test_token"})
     @patch("mcp_logseq.tools.logseq.LogSeq")
@@ -220,7 +220,7 @@ class TestListPagesToolHandler:
         assert tool.name == "list_pages"
         assert tool.description is not None
         assert "Lists all pages in a LogSeq graph" in tool.description
-        assert tool.inputSchema["required"] == []
+        assert tool.input_schema["required"] == []
 
     @patch.dict("os.environ", {"LOGSEQ_API_TOKEN": "test_token"})
     @patch("mcp_logseq.tools.logseq.LogSeq")
@@ -283,7 +283,7 @@ class TestGetPageContentToolHandler:
         assert tool.name == "get_page_content"
         assert tool.description is not None
         assert "Get the content of a specific page" in tool.description
-        assert tool.inputSchema["required"] == ["page_name"]
+        assert tool.input_schema["required"] == ["page_name"]
 
     @patch.dict("os.environ", {"LOGSEQ_API_TOKEN": "test_token"})
     @patch("mcp_logseq.tools.logseq.LogSeq")
@@ -541,7 +541,7 @@ class TestDeletePageToolHandler:
         assert tool.name == "delete_page"
         assert tool.description is not None
         assert "Delete a page from LogSeq" in tool.description
-        assert tool.inputSchema["required"] == ["page_name"]
+        assert tool.input_schema["required"] == ["page_name"]
 
     @patch.dict("os.environ", {"LOGSEQ_API_TOKEN": "test_token"})
     @patch("mcp_logseq.tools.logseq.LogSeq")
@@ -590,7 +590,7 @@ class TestDeleteBlockToolHandler:
 
         assert tool.name == "delete_block"
         assert "Delete a block from LogSeq" in tool.description
-        assert tool.inputSchema["required"] == ["block_uuid"]
+        assert tool.input_schema["required"] == ["block_uuid"]
 
     @patch.dict("os.environ", {"LOGSEQ_API_TOKEN": "test_token"})
     @patch("mcp_logseq.tools.logseq.LogSeq")
@@ -665,7 +665,7 @@ class TestUpdateBlockToolHandler:
 
         assert tool.name == "update_block"
         assert "Update the content of an existing LogSeq block" in tool.description
-        assert tool.inputSchema["required"] == ["block_uuid", "content"]
+        assert tool.input_schema["required"] == ["block_uuid", "content"]
 
     @patch.dict("os.environ", {"LOGSEQ_API_TOKEN": "test_token"})
     @patch("mcp_logseq.tools.logseq.LogSeq")
@@ -741,10 +741,10 @@ class TestUpdatePageToolHandler:
         assert tool.name == "update_page"
         assert tool.description is not None
         assert "Update a page in Logseq" in tool.description
-        assert tool.inputSchema["required"] == ["page_name"]
+        assert tool.input_schema["required"] == ["page_name"]
         # Should have mode parameter
-        assert "mode" in tool.inputSchema["properties"]
-        assert tool.inputSchema["properties"]["mode"]["enum"] == ["append", "replace"]
+        assert "mode" in tool.input_schema["properties"]
+        assert tool.input_schema["properties"]["mode"]["enum"] == ["append", "replace"]
 
     @patch.dict("os.environ", {"LOGSEQ_API_TOKEN": "test_token"})
     @patch("mcp_logseq.tools.logseq.LogSeq")
@@ -857,7 +857,7 @@ class TestSearchToolHandler:
         assert tool.name == "search"
         assert tool.description is not None
         assert "Search for content across LogSeq pages" in tool.description
-        assert tool.inputSchema["required"] == ["query"]
+        assert tool.input_schema["required"] == ["query"]
 
     @patch.dict("os.environ", {"LOGSEQ_API_TOKEN": "test_token"})
     @patch("mcp_logseq.tools.logseq.LogSeq")
@@ -1045,10 +1045,10 @@ class TestQueryToolHandler:
 
         assert tool.name == "query"
         assert "Execute a Logseq DSL query" in tool.description
-        assert "query" in tool.inputSchema["properties"]
-        assert "limit" in tool.inputSchema["properties"]
-        assert "result_type" in tool.inputSchema["properties"]
-        assert tool.inputSchema["required"] == ["query"]
+        assert "query" in tool.input_schema["properties"]
+        assert "limit" in tool.input_schema["properties"]
+        assert "result_type" in tool.input_schema["properties"]
+        assert tool.input_schema["required"] == ["query"]
 
     @patch.dict('os.environ', {'LOGSEQ_API_TOKEN': 'test_token'})
     @patch('mcp_logseq.tools.logseq.LogSeq')
@@ -1221,10 +1221,10 @@ class TestFindPagesByPropertyToolHandler:
 
         assert tool.name == "find_pages_by_property"
         assert "Find all pages that have a specific property" in tool.description
-        assert "property_name" in tool.inputSchema["properties"]
-        assert "property_value" in tool.inputSchema["properties"]
-        assert "limit" in tool.inputSchema["properties"]
-        assert tool.inputSchema["required"] == ["property_name"]
+        assert "property_name" in tool.input_schema["properties"]
+        assert "property_value" in tool.input_schema["properties"]
+        assert "limit" in tool.input_schema["properties"]
+        assert tool.input_schema["required"] == ["property_name"]
 
     @patch.dict('os.environ', {'LOGSEQ_API_TOKEN': 'test_token'})
     @patch('mcp_logseq.tools.logseq.LogSeq')
@@ -1332,8 +1332,8 @@ class TestGetPagesFromNamespaceToolHandler:
 
         assert tool.name == "get_pages_from_namespace"
         assert "namespace" in tool.description.lower()
-        assert "namespace" in tool.inputSchema["properties"]
-        assert "namespace" in tool.inputSchema["required"]
+        assert "namespace" in tool.input_schema["properties"]
+        assert "namespace" in tool.input_schema["required"]
 
     @patch.dict('os.environ', {'LOGSEQ_API_TOKEN': 'test_token'})
     @patch('mcp_logseq.tools.logseq.LogSeq')
@@ -1396,8 +1396,8 @@ class TestGetPagesTreeFromNamespaceToolHandler:
 
         assert tool.name == "get_pages_tree_from_namespace"
         assert "tree" in tool.description.lower()
-        assert "namespace" in tool.inputSchema["properties"]
-        assert "namespace" in tool.inputSchema["required"]
+        assert "namespace" in tool.input_schema["properties"]
+        assert "namespace" in tool.input_schema["required"]
 
     @patch.dict('os.environ', {'LOGSEQ_API_TOKEN': 'test_token'})
     @patch('mcp_logseq.tools.logseq.LogSeq')
@@ -1470,10 +1470,10 @@ class TestRenamePageToolHandler:
 
         assert tool.name == "rename_page"
         assert "rename" in tool.description.lower()
-        assert "old_name" in tool.inputSchema["properties"]
-        assert "new_name" in tool.inputSchema["properties"]
-        assert "old_name" in tool.inputSchema["required"]
-        assert "new_name" in tool.inputSchema["required"]
+        assert "old_name" in tool.input_schema["properties"]
+        assert "new_name" in tool.input_schema["properties"]
+        assert "old_name" in tool.input_schema["required"]
+        assert "new_name" in tool.input_schema["required"]
 
     @patch.dict('os.environ', {'LOGSEQ_API_TOKEN': 'test_token'})
     @patch('mcp_logseq.tools.logseq.LogSeq')
@@ -1549,9 +1549,9 @@ class TestGetPageBacklinksToolHandler:
 
         assert tool.name == "get_page_backlinks"
         assert "backlink" in tool.description.lower()
-        assert "page_name" in tool.inputSchema["properties"]
-        assert "include_content" in tool.inputSchema["properties"]
-        assert "page_name" in tool.inputSchema["required"]
+        assert "page_name" in tool.input_schema["properties"]
+        assert "include_content" in tool.input_schema["properties"]
+        assert "page_name" in tool.input_schema["required"]
 
     @patch.dict('os.environ', {'LOGSEQ_API_TOKEN': 'test_token'})
     @patch('mcp_logseq.tools.logseq.LogSeq')
@@ -1681,10 +1681,10 @@ class TestInsertNestedBlockToolHandler:
 
         assert tool.name == "insert_nested_block"
         assert "child" in tool.description.lower() or "nested" in tool.description.lower()
-        assert "parent_block_uuid" in tool.inputSchema["properties"]
-        assert "content" in tool.inputSchema["properties"]
-        assert "sibling" in tool.inputSchema["properties"]
-        assert tool.inputSchema["required"] == ["parent_block_uuid", "content"]
+        assert "parent_block_uuid" in tool.input_schema["properties"]
+        assert "content" in tool.input_schema["properties"]
+        assert "sibling" in tool.input_schema["properties"]
+        assert tool.input_schema["required"] == ["parent_block_uuid", "content"]
 
     @patch.dict('os.environ', {'LOGSEQ_API_TOKEN': 'test_token'})
     @patch('mcp_logseq.tools.logseq.LogSeq')
@@ -1805,9 +1805,9 @@ class TestGetBlockToolHandler:
 
         assert tool.name == "get_block"
         assert "Get a single block" in tool.description
-        assert tool.inputSchema["required"] == ["block_uuid"]
-        assert "include_children" in tool.inputSchema["properties"]
-        assert "format" in tool.inputSchema["properties"]
+        assert tool.input_schema["required"] == ["block_uuid"]
+        assert "include_children" in tool.input_schema["properties"]
+        assert "format" in tool.input_schema["properties"]
 
     @patch.dict("os.environ", {"LOGSEQ_API_TOKEN": "test_token"})
     @patch("mcp_logseq.tools.logseq.LogSeq")

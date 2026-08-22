@@ -71,7 +71,7 @@ class TestMCPServerIntegration:
             assert isinstance(tool_desc, Tool)
             assert hasattr(tool_desc, "name")
             assert hasattr(tool_desc, "description")
-            assert hasattr(tool_desc, "inputSchema")
+            assert hasattr(tool_desc, "input_schema")
 
     @patch.dict("os.environ", {"LOGSEQ_API_TOKEN": "test_token"})
     @patch("mcp_logseq.tools.logseq.LogSeq")
