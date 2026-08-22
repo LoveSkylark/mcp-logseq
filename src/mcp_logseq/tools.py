@@ -2752,7 +2752,6 @@ class GetTagsByNameToolHandler(_DBToolHandler):
         if "tag_name" not in args: raise RuntimeError("tag_name argument required")
         return self._execute(args)
 
-
 class CreateTagToolHandler(_DBToolHandler):
     def __init__(self): super().__init__("create_tag")
     def get_tool_description(self):
