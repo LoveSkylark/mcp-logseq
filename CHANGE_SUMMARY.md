@@ -10,7 +10,7 @@
 - Added database mode support for LogSeq installations that expose database-specific data.
 - Added LogSeq 2.x DB graph reads, native search, UUID-based page data, and DB-backed vector indexing while retaining the legacy Markdown graph path.
 - Added native DB tag and property discovery tools.
-- Added typed DB property access, tag/class relationship operations, and DB node/task/asset listings.
+- Added typed DB property access and tag/class relationship operations.
 - Added read-only server mode, which hides content-changing tools while keeping read and search tools available.
 - Added asynchronous thread offloading so synchronous API calls do not block the MCP event loop.
 - Kept vector search, vector status, and external vector-sync tools available when vector support is configured.

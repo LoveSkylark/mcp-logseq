@@ -192,15 +192,6 @@ class LogSeq:
             logger.error(f"Error listing properties: {str(e)}")
             raise
 
-    def list_nodes(self, options: dict | None = None) -> Any:
-        return self._call_api("logseq.cli.listNodes", [options or {}])
-
-    def list_tasks(self, options: dict | None = None) -> Any:
-        return self._call_api("logseq.cli.listTasks", [options or {}])
-
-    def list_assets(self, options: dict | None = None) -> Any:
-        return self._call_api("logseq.cli.listAssets", [options or {}])
-
     def get_property(self, property_name: str) -> Any:
         return self._call_api("logseq.Editor.getProperty", [property_name])
 

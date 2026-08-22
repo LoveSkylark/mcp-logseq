@@ -164,7 +164,7 @@ Use [Ollama](https://ollama.com) for fully local embeddings, OpenAI, or another 
 
 ## 🛠️ Available Tools
 
-The server provides 42 standard tools, grouped by graph type, plus 3 optional vector tools.
+The server provides 39 verified standard tools, grouped by graph type, plus 3 optional vector tools.
 
 ### File Graph Tools
 
@@ -216,9 +216,6 @@ DB node relationships. Enable them with `LOGSEQ_DB_MODE=true` or
 | **`create_tag`** | Create a tag/class |
 | **`add_block_tag`** | Add a tag to a DB node |
 | **`remove_block_tag`** | Remove a tag from a DB node |
-| **`list_nodes`** | List DB nodes with native options |
-| **`list_tasks`** | List task nodes |
-| **`list_assets`** | List asset nodes |
 | **`add_tag_property`** | Add a property to a tag/class |
 | **`remove_tag_property`** | Remove a property from a tag/class |
 | **`add_tag_extends`** | Add a parent class to a tag |

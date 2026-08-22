@@ -1,62 +1,18 @@
 import json
-import math
 import os
 import re
 import logging
 import threading
+import uuid
 from typing import Any
 from urllib.parse import urlparse
 from . import logseq
 from . import parser
 from . import access
-from .config import load_exclude_tags, load_include_namespaces, load_exclude_namespaces
+from .settings import load_settings
 from mcp.types import Tool, TextContent
 
 logger = logging.getLogger("mcp-logseq")
-
-_api_url = os.getenv("LOGSEQ_API_URL", "http://localhost:12315")
-_parsed_url = urlparse(_api_url)
-_api_protocol = _parsed_url.scheme or "http"
-_api_host = _parsed_url.hostname or "127.0.0.1"
-_api_port = _parsed_url.port or 12315
-
-def _parse_positive_float_env(name: str, default: float) -> float:
-    raw_value = os.getenv(name, "").strip()
-    if not raw_value:
-        return default
-
-    try:
-        value = float(raw_value)
-    except ValueError:
-        value = None
-
-    if value is None or not math.isfinite(value) or value <= 0:
-        logger.warning(
-            f"{name} must be a positive number of seconds, got {raw_value!r}; "
-            f"falling back to default {default}"
-        )
-        return default
-
-    return value
-
-
-_api_connect_timeout = _parse_positive_float_env("LOGSEQ_API_CONNECT_TIMEOUT", 3)
-_api_read_timeout = _parse_positive_float_env("LOGSEQ_API_READ_TIMEOUT", 6)
-_api_timeout = (_api_connect_timeout, _api_read_timeout)
-
-_verify_ssl_env = os.getenv("LOGSEQ_VERIFY_SSL")
-if _verify_ssl_env is not None:
-    _api_verify_ssl = _verify_ssl_env.lower() not in ("0", "false", "no")
-else:
-    _api_verify_ssl = _api_protocol == "https"
-
-_db_mode_setting = os.getenv("LOGSEQ_DB_MODE", "auto").lower()
-_db_mode = "auto" if _db_mode_setting in ("", "auto") else _db_mode_setting in (
-    "1", "true", "yes"
-)
-_exclude_tags: list[str] = load_exclude_tags()
-_include_namespaces: list[str] = load_include_namespaces()
-_exclude_namespaces: list[str] = load_exclude_namespaces()
 
 _api_client_lock = threading.Lock()
 _api_client = None
@@ -66,61 +22,49 @@ _api_client_factory = None
 
 def _get_db_mode() -> bool:
     """Return DB mode through the compatibility hook used by handlers/tests."""
-    if _db_mode is True:
+    setting = _get_db_mode_setting()
+    if setting is True:
         return True
-    if _db_mode == "auto" and _api_client is not None:
-        return _api_client.db_mode is True
+    if setting == "auto":
+        if _api_client is None:
+            _make_api()
+        return _api_client is not None and _api_client.db_mode is True
     return False
 
 
 def _get_db_mode_setting() -> bool | str:
-    setting = os.getenv("LOGSEQ_DB_MODE", "auto").lower()
-    if setting in ("", "auto"):
-        return "auto"
-    return setting in ("1", "true", "yes")
+    return load_settings().db_mode
 
 
 def _make_api() -> logseq.LogSeq:
     global _api_client, _api_client_key, _api_client_factory
 
-    api_key = os.getenv("LOGSEQ_API_TOKEN", "")
-    if not api_key:
-        raise ValueError("LOGSEQ_API_TOKEN environment variable required")
-    api_url = os.getenv("LOGSEQ_API_URL", "http://localhost:12315")
-    parsed_url = urlparse(api_url)
-    protocol = parsed_url.scheme or "http"
-    host = parsed_url.hostname or "127.0.0.1"
-    port = parsed_url.port or 12315
-    connect_timeout = _parse_positive_float_env("LOGSEQ_API_CONNECT_TIMEOUT", 3)
-    read_timeout = _parse_positive_float_env("LOGSEQ_API_READ_TIMEOUT", 6)
-    timeout = (connect_timeout, read_timeout)
-    verify_ssl_env = os.getenv("LOGSEQ_VERIFY_SSL")
-    verify_ssl = (
-        verify_ssl_env.lower() not in ("0", "false", "no")
-        if verify_ssl_env is not None
-        else protocol == "https"
-    )
+    settings = load_settings()
+    protocol = settings.protocol
+    host = settings.host
+    port = settings.port
+    timeout = settings.timeout
     key = (
-        api_key,
+        settings.api_key,
         protocol,
         host,
         port,
-        verify_ssl,
+        settings.verify_ssl,
         timeout,
-        _get_db_mode_setting(),
+        settings.db_mode,
     )
     with _api_client_lock:
         if key != _api_client_key or logseq.LogSeq is not _api_client_factory:
             _api_client = logseq.LogSeq(
-                api_key=api_key,
+                api_key=settings.api_key,
                 protocol=protocol,
                 host=host,
                 port=port,
-                verify_ssl=verify_ssl,
+                verify_ssl=settings.verify_ssl,
                 timeout=timeout,
-                db_mode=_get_db_mode_setting() is True,
+                db_mode=settings.db_mode is True,
             )
-            if _get_db_mode_setting() == "auto":
+            if settings.db_mode == "auto":
                 _api_client.db_mode = _api_client.check_current_is_db_graph()
             _api_client_key = key
             _api_client_factory = logseq.LogSeq
@@ -288,8 +232,14 @@ def _validate_upsert_operations(operations: list[dict]) -> None:
             raise ValueError(f"operation {index} has invalid entityType")
         if not isinstance(data, dict):
             raise ValueError(f"operation {index} data must be an object")
-        if operation_type == "edit" and not isinstance(operation.get("id"), str):
-            raise ValueError(f"operation {index} edit requires a string id")
+        if operation_type == "edit":
+            operation_id = operation.get("id")
+            if not isinstance(operation_id, str):
+                raise ValueError(f"operation {index} edit requires a string id")
+            try:
+                uuid.UUID(operation_id)
+            except ValueError as error:
+                raise ValueError(f"operation {index} edit id must be a UUID") from error
         if operation_type == "add" and entity_type == "block":
             if not isinstance(data.get("title"), str) or not data["title"].strip():
                 raise ValueError(f"operation {index} block add requires title")
@@ -303,6 +253,14 @@ def _validate_upsert_operations(operations: list[dict]) -> None:
             or any(not isinstance(tag, str) for tag in data["tags"])
         ):
             raise ValueError(f"operation {index} tags must be a string array")
+        if "tags" in data:
+            for tag in data["tags"]:
+                try:
+                    uuid.UUID(tag)
+                except ValueError as error:
+                    raise ValueError(
+                        f"operation {index} tags must contain UUID strings"
+                    ) from error
 
 
 def _enforce_namespace_access(page_name: str) -> None:
@@ -677,8 +635,12 @@ class GetPageContentToolHandler(ToolHandler):
         if "page_name" not in args:
             raise RuntimeError("page_name argument required")
 
-        # DB page identifiers may be UUIDs; resolve them before applying name ACLs.
-        if not _get_db_mode():
+        # Names can be checked before any API call; UUIDs require DB resolution.
+        try:
+            is_uuid = uuid.UUID(str(args["page_name"]))
+        except (ValueError, AttributeError, TypeError):
+            is_uuid = None
+        if is_uuid is None:
             _enforce_namespace_access(args["page_name"])
 
         try:
@@ -2756,7 +2718,8 @@ class GetTagToolHandler(_DBToolHandler):
     def __init__(self): super().__init__("get_tag")
     def get_tool_description(self):
         return Tool(name=self.name, description="Get a DB graph tag/class by name or UUID.", inputSchema={
-            "type": "object", "properties": {"tag": {"type": "string"}}, "required": ["tag"],
+            "type": "object", "properties": {"tag": {"type": "string"}},
+            "required": ["tag"],
         })
     def _call(self, api, args): return api.get_tag(args["tag"])
     def run_tool(self, args):
@@ -2768,7 +2731,8 @@ class GetTagObjectsToolHandler(_DBToolHandler):
     def __init__(self): super().__init__("get_tag_objects")
     def get_tool_description(self):
         return Tool(name=self.name, description="List DB nodes carrying a tag/class.", inputSchema={
-            "type": "object", "properties": {"tag": {"type": "string"}}, "required": ["tag"],
+            "type": "object", "properties": {"tag": {"type": "string"}},
+            "required": ["tag"],
         })
     def _call(self, api, args): return api.get_tag_objects(args["tag"])
     def run_tool(self, args):
@@ -2780,7 +2744,8 @@ class GetTagsByNameToolHandler(_DBToolHandler):
     def __init__(self): super().__init__("get_tags_by_name")
     def get_tool_description(self):
         return Tool(name=self.name, description="Find DB graph tags by name.", inputSchema={
-            "type": "object", "properties": {"tag_name": {"type": "string"}}, "required": ["tag_name"],
+            "type": "object", "properties": {"tag_name": {"type": "string"}},
+            "required": ["tag_name"],
         })
     def _call(self, api, args): return api.get_tags_by_name(args["tag_name"])
     def run_tool(self, args):
@@ -2829,36 +2794,6 @@ class RemoveBlockTagToolHandler(AddBlockTagToolHandler):
         _enforce_block_namespace_access(api, args["block_uuid"])
         _enforce_block_tag_access(api, args["block_uuid"])
         return api.remove_block_tag(args["block_uuid"], args["tag"])
-
-
-class _DBListHandler(_DBToolHandler):
-    method_name = ""
-    item_name = "items"
-
-    def get_tool_description(self):
-        return Tool(name=self.name, description=f"List DB graph {self.item_name}.", inputSchema={
-            "type": "object", "properties": {"options": {"type": "object"}},
-        })
-
-    def _call(self, api, args):
-        return getattr(api, self.method_name)(args.get("options", {}))
-
-    def run_tool(self, args): return self._execute(args)
-
-
-class ListNodesToolHandler(_DBListHandler):
-    method_name = "list_nodes"
-    def __init__(self): super().__init__("list_nodes")
-
-
-class ListTasksToolHandler(_DBListHandler):
-    method_name = "list_tasks"
-    def __init__(self): super().__init__("list_tasks")
-
-
-class ListAssetsToolHandler(_DBListHandler):
-    method_name = "list_assets"
-    def __init__(self): super().__init__("list_assets")
 
 
 class _TagRelationHandler(_DBToolHandler):
@@ -2947,7 +2882,6 @@ __all__ = [
     "RemoveBlockPropertyToolHandler", "GetTagToolHandler", "GetTagObjectsToolHandler",
     "GetTagsByNameToolHandler", "CreateTagToolHandler", "AddBlockTagToolHandler",
     "RemoveBlockTagToolHandler",
-    "ListNodesToolHandler", "ListTasksToolHandler", "ListAssetsToolHandler",
     "AddTagPropertyToolHandler", "RemoveTagPropertyToolHandler",
     "AddTagExtendsToolHandler", "RemoveTagExtendsToolHandler",
 ]

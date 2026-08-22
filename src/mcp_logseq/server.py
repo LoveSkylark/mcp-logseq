@@ -1,5 +1,4 @@
 import asyncio
-import json
 import logging
 import sys
 from collections.abc import Sequence
@@ -23,8 +22,6 @@ logging.basicConfig(
 logger = logging.getLogger("mcp-logseq")
 
 # Add a file handler to keep logs (in user's home directory to avoid permission issues)
-import tempfile
-
 log_dir = os.path.expanduser("~/.cache/mcp-logseq")
 os.makedirs(log_dir, exist_ok=True)
 log_file = os.path.join(log_dir, "mcp_logseq.log")
@@ -43,9 +40,6 @@ load_dotenv()
 from . import tools
 
 # Load environment variables with more verbose logging
-api_url = os.getenv("LOGSEQ_API_URL", "http://localhost:12315")
-logger.info(f"Using API URL: {api_url}")
-
 # Names of the genuine write tools — tools that mutate Logseq content. When
 # ``read_only`` is set these are NOT registered. ``sync_vector_db`` is NOT in
 # this set: it mutates the (local) vector index, not Logseq content, and stays
@@ -113,9 +107,6 @@ def _register_all_tool_handlers(handlers: dict, read_only: bool = False) -> None
     add(tools.CreateTagToolHandler())
     add(tools.AddBlockTagToolHandler())
     add(tools.RemoveBlockTagToolHandler())
-    add(tools.ListNodesToolHandler())
-    add(tools.ListTasksToolHandler())
-    add(tools.ListAssetsToolHandler())
     add(tools.AddTagPropertyToolHandler())
     add(tools.RemoveTagPropertyToolHandler())
     add(tools.AddTagExtendsToolHandler())
