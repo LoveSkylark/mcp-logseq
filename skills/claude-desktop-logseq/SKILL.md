@@ -706,12 +706,23 @@ healthy refs are UUIDs too — do not mistake those for damage.
 
 ### Always link by UUID, never by name
 
+This is absolute. It applies even to a page you are certain exists, even mid-batch, even
+when the name is short and obvious. In one session this rule was known, written down, and
+still broken three times in a single batch — creating four duplicate pages that then had to
+be found and deleted by hand. There is no case where a name-link is worth the risk.
+
 `update_block` with `[[Page Name]]` is a **coin flip**. Logseq 2.0.1 sometimes matches the
 existing page and sometimes creates a fresh empty duplicate carrying the same title. During
 one rapid batch of edits, 8 of ~20 name-links created duplicates.
 
 Writing `[[<target-page-uuid>]]` always binds to the intended page, and Logseq renders it as
 the page name. This is also how the graph stores links internally.
+
+**Verify every target UUID is a real page before using it.** UUIDs harvested from an
+enumeration dump are a mix of working refs *and* dangling ones — reusing a dangling UUID as
+a target silently propagates the break. Confirm with `get_page_data(uuid)` or by finding the
+same UUID used in a block that resolves. In one session a dangling UUID was nearly written
+into a repair as a target; it was caught only during a dry-run review.
 
 ```
 1. search(query="Target Page") → take the uuid from the `pages` array
@@ -776,6 +787,22 @@ In a graph built through MCP, expect *every* property to be plugin-namespaced. C
 | `get_property(property_name)` | ✅ Reads a property definition |
 | `upsert_property(property_name, schema, options)` | ✅ Creates or updates a typed property definition |
 | `set_block_properties` | ⚠️ Compatibility handler; prefer the typed handlers above |
+
+### Built-ins cannot be set — verified
+
+`upsert_block_property` with `alias` **returns success and stores the value**, but as
+`:plugin.property._test_plugin/alias`, **not** `:block/alias`. The string displays in the
+property panel; the alias does nothing. `[[Alternate Name]]` still fails to resolve, and
+backlinks do not merge.
+
+This is worse than leaving it unset, because it looks correct. The same applies to `icon`,
+`tags`, `description`, `deadline`, `priority`.
+
+`remove_block_property` does work, so a mistaken write can be cleaned up.
+
+**Aliases must be set in the UI:** open the page → **+ Add property** → **Alias**. Put
+alternate names in an `## Also known as` section and list them for the user to convert by
+hand.
 
 ### Reading them
 
