@@ -24,6 +24,7 @@ from mcp_logseq.tools import (
     InsertNestedBlockToolHandler,
 )
 from mcp_logseq.tools.properties import GetBlockPropertyToolHandler
+from mcp_logseq.tools.db_native import SearchBlocksToolHandler
 
 
 class TestToolConfiguration:
@@ -2018,6 +2019,41 @@ class TestGetBlockPropertyToolHandler:
         })
 
         assert json.loads(result[0].text) == "hello"
+
+
+class TestSearchBlocksToolHandler:
+    @patch.dict("os.environ", {"LOGSEQ_API_TOKEN": "test_token", "LOGSEQ_DB_MODE": "true"})
+    @patch("mcp_logseq.tools.logseq.LogSeq")
+    def test_enriches_results_with_db_properties(self, mock_logseq_class):
+        mock_api = Mock()
+        mock_api.search_content.return_value = {
+            "blocks": [{"id": 349, "uuid": "block-1", "content": "hello"}],
+            "hasMore?": False,
+        }
+        mock_api.get_blocks_db_properties.return_value = {"block-1": {"Alias": "hello"}}
+        mock_logseq_class.return_value = mock_api
+
+        handler = SearchBlocksToolHandler()
+        result = handler.run_tool({"query": "hello"})
+
+        payload = json.loads(result[0].text)
+        assert payload["blocks"][0]["properties"] == {"Alias": "hello"}
+
+    @patch.dict("os.environ", {"LOGSEQ_API_TOKEN": "test_token", "LOGSEQ_DB_MODE": "true"})
+    @patch("mcp_logseq.tools.logseq.LogSeq")
+    def test_property_lookup_failure_does_not_break_search(self, mock_logseq_class):
+        mock_api = Mock()
+        mock_api.search_content.return_value = {
+            "blocks": [{"id": 349, "uuid": "block-1", "content": "hello"}],
+        }
+        mock_api.get_blocks_db_properties.side_effect = RuntimeError("query failed")
+        mock_logseq_class.return_value = mock_api
+
+        handler = SearchBlocksToolHandler()
+        result = handler.run_tool({"query": "hello"})
+
+        payload = json.loads(result[0].text)
+        assert "properties" not in payload["blocks"][0]
 
 
 class TestDbUpsertValidation:

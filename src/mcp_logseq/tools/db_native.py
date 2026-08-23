@@ -313,13 +313,27 @@ class ListPropertiesToolHandler(ToolHandler):
 class SearchBlocksToolHandler(_DBToolHandler):
     def __init__(self): super().__init__("search_blocks")
     def get_tool_description(self):
-        return Tool(name=self.name, description="Search DB graph blocks by content.", inputSchema={
+        return Tool(name=self.name, description="Search DB graph blocks by content. Each "
+            "result includes its DB properties (e.g. Alias, Status, user-defined "
+            "properties) when it has any.", inputSchema={
             "type": "object", "properties": {"query": {"type": "string"}},
             "required": ["query"],
         })
     def _call(self, api, args):
         if not args.get("query", "").strip(): raise RuntimeError("query is required")
-        return api.search_content(args["query"], {"enable-snippet?": False})
+        result = api.search_content(args["query"], {"enable-snippet?": False})
+        blocks = result.get("blocks") if isinstance(result, dict) else None
+        if blocks:
+            try:
+                db_properties = api.get_blocks_db_properties(blocks)
+            except Exception as e:
+                logger.warning(f"Could not fetch DB-mode properties for search results: {e}")
+                db_properties = {}
+            for block in blocks:
+                props = db_properties.get(str(block.get("uuid", "")))
+                if props:
+                    block["properties"] = props
+        return result
     def run_tool(self, args): return self._execute(args)
 
 
