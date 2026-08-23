@@ -504,6 +504,41 @@ Update config with full path:
 
 For local development, testing, and contributing, see **[DEVELOPMENT.md](DEVELOPMENT.md)**.
 
+### Project Structure
+
+```text
+src/mcp_logseq/
+├── server.py          # MCP server setup, tool registration, read-only/profile handling
+├── settings.py         # Environment/config-file settings loader
+├── access.py           # Namespace/tag access-control policy and enforcement
+├── namespace.py         # Namespace matching helpers
+├── parser.py           # Markdown <-> Logseq block parsing (file graphs)
+├── transport/          # HTTP transport (auth, streaming)
+├── vector/              # Optional semantic search (embedder, db, sync, index)
+├── bin/                 # logseq-sync CLI entry point
+├── logseq/              # LogSeq HTTP API client, split into mixins by area:
+│   ├── __init__.py         #   GRAPH_OPERATION_ROUTES, LogSeq class composition
+│   ├── pages.py            #   PageMixin  - page CRUD, namespaces, backlinks
+│   ├── blocks.py           #   BlockMixin - block CRUD, batch/nested insert
+│   ├── properties.py       #   PropertyMixin - DB properties, datascript queries
+│   ├── tags.py             #   TagMixin - DB tag/class operations
+│   └── search.py           #   SearchMixin - search, DSL query, upsert_nodes
+└── tools/                # MCP tool handlers, split by domain:
+    ├── __init__.py         #   Shared state, ToolHandler/_DBToolHandler bases, re-exports
+    ├── pages.py            #   Page tool handlers
+    ├── blocks.py            #   Block tool handlers
+    ├── search.py             #   search/query/find_pages_by_property
+    ├── db_native.py          #   upsert_nodes, get_page_data, list_tags/properties
+    ├── properties.py         #   DB property tool handlers
+    └── tags.py               #   DB tag tool handlers
+```
+
+`logseq/` is the API client (one `LogSeq` class per graph mode); `tools/`
+is the MCP-facing layer that wraps it with validation, access control, and
+response formatting. See [LOGSEQ_API_ARCHITECTURE.md](LOGSEQ_API_ARCHITECTURE.md)
+for the `logseq.Editor.*` (file graph) vs `logseq.cli.*`/`logseq.app.*`
+(DB graph) routing policy those two packages implement.
+
 ---
 
 **Ready to supercharge your LogSeq workflow with AI?**
