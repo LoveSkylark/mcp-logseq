@@ -1925,10 +1925,32 @@ class TestGetBlockToolHandler:
 
     @patch.dict("os.environ", {"LOGSEQ_API_TOKEN": "test_token", "LOGSEQ_DB_MODE": "true"})
     @patch("mcp_logseq.tools.logseq.LogSeq")
-    def test_db_run_tool_uses_page_data_when_page_is_supplied(self, mock_logseq_class):
-        """get_block has no working DB route (its cli.getBlock candidate hangs),
-        so a DB read with page_name goes through get_page_data's direct children."""
+    def test_db_run_tool_prefers_direct_read_even_with_page_name(self, mock_logseq_class):
+        """get_block always tries the direct read first, even when page_name is
+        supplied -- the page_name/get_page_data path never includes children
+        (get_page_data's blocks have no "children" key at all), so silently
+        preferring it hid every nested child. Direct read wins whenever it works."""
         mock_api = Mock()
+        mock_api.get_block.return_value = {
+            "uuid": "abc-123", "content": "Block content",
+            "children": [{"uuid": "child-1", "content": "Nested child", "children": []}],
+        }
+        mock_logseq_class.return_value = mock_api
+
+        handler = GetBlockToolHandler()
+        result = handler.run_tool({"block_uuid": "abc-123", "page_name": "Test Page"})
+
+        mock_api.get_block.assert_called_once_with("abc-123", include_children=True)
+        mock_api.get_block_from_page_data.assert_not_called()
+        assert "Block content" in result[0].text
+        assert "Nested child" in result[0].text
+
+    @patch.dict("os.environ", {"LOGSEQ_API_TOKEN": "test_token", "LOGSEQ_DB_MODE": "true"})
+    @patch("mcp_logseq.tools.logseq.LogSeq")
+    def test_db_run_tool_falls_back_to_page_data_when_direct_read_fails(self, mock_logseq_class):
+        """page_name is only a fallback for when the direct read itself fails."""
+        mock_api = Mock()
+        mock_api.get_block.side_effect = RuntimeError("get_block is not available for Logseq DB graphs")
         mock_api.get_block_from_page_data.return_value = {
             "uuid": "abc-123", "content": "Block content", "children": []
         }
@@ -1938,7 +1960,6 @@ class TestGetBlockToolHandler:
         result = handler.run_tool({"block_uuid": "abc-123", "page_name": "Test Page"})
 
         mock_api.get_block_from_page_data.assert_called_once_with("Test Page", "abc-123")
-        mock_api.get_block.assert_not_called()
         assert "Block content" in result[0].text
 
     @patch.dict("os.environ", {"LOGSEQ_API_TOKEN": "test_token", "LOGSEQ_DB_MODE": "true"})

@@ -141,7 +141,7 @@ class GetBlockToolHandler(ToolHandler):
                     },
                     "page_name": {
                         "type": "string",
-                        "description": "Optional owning page name or UUID. Not required -- get_block reads the block directly in both graph modes. If supplied, reads via get_page_data instead, which only sees the page's DIRECT children (a Logseq API limit); prefer omitting this.",
+                        "description": "Optional owning page name or UUID, used only as a fallback if the direct read fails. get_block always tries a direct read first (includes children in both graph modes); the page_name path never includes children, since get_page_data has no children key at all -- prefer omitting this argument.",
                     },
                     "include_children": {
                         "type": "boolean",
@@ -170,19 +170,23 @@ class GetBlockToolHandler(ToolHandler):
 
         try:
             api = _tools._make_api()
-            if _tools._get_db_mode() and page_name:
-                # Direct get_block works in DB mode too (verified 2026-08-23),
-                # but only sees the page's direct children when read this way;
-                # kept for callers that already pass page_name.
+            _enforce_block_namespace_access(api, block_uuid)
+            _enforce_block_tag_access(api, block_uuid)
+            try:
+                # Direct read always wins: it includes children (recursively)
+                # in both graph modes. The page_name/get_page_data path below
+                # is a fallback only -- its blocks have no "children" key at
+                # all, so routing through it by default silently hid every
+                # nested child (the exact bug this ordering fixes).
+                result = api.get_block(block_uuid, include_children=include_children)
+            except Exception:
+                if not (_tools._get_db_mode() and page_name):
+                    raise
                 _enforce_namespace_access(page_name)
                 _enforce_page_tag_access(api, page_name)
                 result = _normalize_db_block(
                     api.get_block_from_page_data(page_name, block_uuid)
                 )
-            else:
-                _enforce_block_namespace_access(api, block_uuid)
-                _enforce_block_tag_access(api, block_uuid)
-                result = api.get_block(block_uuid, include_children=include_children)
 
             if output_format == "json":
                 return [TextContent(type="text", text=json.dumps(result, indent=2))]
