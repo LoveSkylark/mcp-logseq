@@ -9,6 +9,17 @@ This skill applies only to a legacy Logseq Markdown/file graph. The MCP server
 must run with `LOGSEQ_DB_MODE=false`. Do not use this skill with a Logseq 2.x
 DB graph.
 
+This server communicates with a file graph through `logseq.Editor.*`/
+`logseq.App.*` only. It never uses `logseq.cli.*`/`logseq.app.*` for a file
+graph -- that namespace is the DB-native adapter and is wired to a completely
+separate skill. You do not choose or influence which namespace is used; call
+the MCP tool names in this skill (`get_block`, `create_page`, `update_page`,
+and so on) and the server always resolves each one to its `Editor.*`/`App.*`
+file route. If you see or are asked about `cli.*` behavior, DB node UUIDs,
+typed properties, or `upsert_nodes` while this skill is active, that is a sign
+the wrong skill or graph mode is in effect -- stop and confirm `LOGSEQ_DB_MODE`
+is `false` before continuing.
+
 ## Scope and configuration
 
 This skill is deliberately file-graph-only. Use a dedicated MCP server with:
@@ -196,6 +207,30 @@ Verify significant edits with `get_page_content` or `search`.
 | Modify outline blocks | `update_block`, `insert_nested_block`, `delete_block` |
 | Query properties | `query`, `find_pages_by_property` |
 | Browse namespaces | `get_pages_from_namespace`, `get_pages_tree_from_namespace` |
+
+## Full tool inventory (file-graph mode)
+
+Every MCP tool name registered when `LOGSEQ_DB_MODE=false`, grouped by area.
+There is no other Logseq access available -- do not invent a tool name or
+call a raw Logseq API method directly.
+
+- **Pages**: `create_page`, `update_page`, `list_pages`, `get_page_content`,
+  `delete_page`, `rename_page`, `get_page_backlinks`,
+  `get_pages_from_namespace`, `get_pages_tree_from_namespace`.
+- **Blocks**: `get_block`, `update_block`, `delete_block`, `insert_nested_block`.
+- **Search and query**: `search`, `query`, `find_pages_by_property`.
+- **Vector (optional, only if configured)**: `vector_search`, `sync_vector_db`,
+  `vector_db_status`.
+
+Not available in file-graph mode (DB-only; do not attempt): `upsert_nodes`,
+`get_page_data`, `search_blocks`, `list_tags`, `list_properties`,
+`get_property`, `upsert_property`, `remove_property`, `get_block_properties`,
+`get_block_property`, `upsert_block_property`, `remove_block_property`,
+`set_block_properties`, `get_tag`, `get_tag_objects`, `get_tags_by_name`,
+`create_tag`, `add_block_tag`, `remove_block_tag`, `add_tag_property`,
+`remove_tag_property`, `add_tag_extends`, `remove_tag_extends`. Use
+`update_page`/`update_block` plus Markdown `key:: value` properties for the
+equivalent file-graph-mode need.
 
 Do not use DB-only tools or assumptions: `get_page_data`, `search_blocks`,
 `list_tags`, `list_properties`, `upsert_nodes`, typed DB properties, DB UUID
