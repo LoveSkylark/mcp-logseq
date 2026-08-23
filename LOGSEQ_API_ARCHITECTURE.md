@@ -62,6 +62,8 @@ Each logical operation records its file method, DB method, DB verification
 status, and any temporary fallback. Verified DB entries are enabled immediately.
 Candidate entries keep their existing fallback until live tests confirm the
 method, payload, response shape, repeated-call behavior, and read-back result.
+Rejected entries keep the fallback permanently: live testing showed the DB
+method itself is unsafe (e.g. it hangs) rather than merely unverified.
 
 Export the current map for the Windows DB test lab with:
 
@@ -72,6 +74,16 @@ python scripts/export-db-route-manifest.py
 Promote a candidate only after the DB harness records a successful scenario.
 This keeps file behavior stable while allowing the DB adapter to migrate one
 operation at a time.
+
+### Confirmed-unsafe DB CLI methods (live-tested against Logseq 2.0.1)
+
+- `logseq.cli.getBlock` hangs indefinitely (curl timeout, HTTP 0) for both
+  `includeChildren: true` and `includeChildren: false`, while other `cli.*`
+  calls made in the same session return normally. `get_block` stays routed to
+  `logseq.Editor.getBlock`.
+- `logseq.cli.getBlockProperties` hangs the same way even with a bare block
+  UUID argument and no options object. `get_block_properties` stays routed to
+  `logseq.Editor.getBlockProperties`.
 
 The Python MCP process reuses one `requests.Session` for all calls made through
 the same configured Logseq endpoint, token, timeout, and graph mode. This is a

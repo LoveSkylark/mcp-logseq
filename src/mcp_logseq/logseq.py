@@ -36,21 +36,24 @@ GRAPH_OPERATION_ROUTES: dict[str, GraphOperationRoute] = {
     "upsert_nodes": GraphOperationRoute(
         None, "logseq.cli.upsertNodes", "verified"
     ),
-    # The DB CLI aliases below are intentionally not enabled until the live
-    # harness proves their argument and response contracts.
+    # logseq.cli.getBlock/getBlockProperties were live-tested against
+    # Logseq 2.0.1 on 2026-08-23 and both hang indefinitely (curl timeout,
+    # HTTP 0) regardless of includeChildren, while other cli.* calls made in
+    # the same session returned normally. Rejected; retain the Editor.*
+    # fallback rather than re-testing without new evidence.
     "get_block": GraphOperationRoute(
         "logseq.Editor.getBlock",
         "logseq.cli.getBlock",
-        "candidate",
+        "rejected",
         db_fallback_method="logseq.Editor.getBlock",
-        notes="Candidate DB CLI mapping; retain the verified Editor fallback until live-tested.",
+        notes="Rejected: logseq.cli.getBlock hangs (HTTP 0, 20s timeout) for both includeChildren=true and false.",
     ),
     "get_block_properties": GraphOperationRoute(
         "logseq.Editor.getBlockProperties",
         "logseq.cli.getBlockProperties",
-        "candidate",
+        "rejected",
         db_fallback_method="logseq.Editor.getBlockProperties",
-        notes="Candidate DB CLI mapping; retain the existing fallback until live-tested.",
+        notes="Rejected: logseq.cli.getBlockProperties hangs (HTTP 0, 20s timeout) even with a bare block UUID argument.",
     ),
 }
 

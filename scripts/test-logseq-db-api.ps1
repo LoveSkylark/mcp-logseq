@@ -120,7 +120,10 @@ function Invoke-LogseqApi {
             StatusCode = $statusCode
             ElapsedSeconds = $elapsedSeconds
             CurlExitCode = $curlExitCode
-            Success = ($statusCode -eq 200 -and $curlExitCode -eq 0 -and $null -eq $parseError)
+            # Some CLI methods (e.g. upsertNodes dry-run) return a plain-text
+            # summary instead of JSON on HTTP 200; a parse failure there is
+            # not itself an API failure, so success depends only on transport.
+            Success = ($statusCode -eq 200 -and $curlExitCode -eq 0)
             Body = $body
             Data = $parsed
             ParseError = $parseError
@@ -133,7 +136,7 @@ function Invoke-LogseqApi {
 
 function Add-Result {
     param(
-        [Parameter(Mandatory = $true)][System.Collections.ArrayList]$Results,
+        [Parameter(Mandatory = $true)][AllowEmptyCollection()][System.Collections.ArrayList]$Results,
         [Parameter(Mandatory = $true)][string]$Name,
         [Parameter(Mandatory = $true)]$Response,
         [bool]$ExpectedSuccess = $true,
@@ -164,11 +167,17 @@ function Assert-Success {
 }
 
 function Find-Block {
-    param([Parameter(Mandatory = $true)]$Blocks, [Parameter(Mandatory = $true)][string]$Marker)
+    param([AllowNull()]$Blocks, [Parameter(Mandatory = $true)][string]$Marker)
+
+    if ($null -eq $Blocks) { return $null }
 
     foreach ($block in @($Blocks)) {
         if ($null -eq $block) { continue }
-        $title = [string](Get-ObjectValue -Object $block -Name "block/title")
+        # Live getPageData returns bare `title`/`uuid`, not namespaced block/title.
+        $title = [string](Get-ObjectValue -Object $block -Name "title")
+        if ([string]::IsNullOrWhiteSpace($title)) {
+            $title = [string](Get-ObjectValue -Object $block -Name "block/title")
+        }
         if ([string]::IsNullOrWhiteSpace($title)) {
             $title = [string](Get-ObjectValue -Object $block -Name "content")
         }
