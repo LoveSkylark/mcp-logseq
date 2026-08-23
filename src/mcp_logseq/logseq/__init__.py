@@ -106,41 +106,59 @@ GRAPH_OPERATION_ROUTES: dict[str, GraphOperationRoute] = {
     ),
     # Not yet live-tested against a cli.* candidate. Unavailable on DB graphs
     # until verified — no fallback to Editor.* under the hard File/DB split.
+    # Live-tested against Logseq 2.0.1 on 2026-08-23 (second pass, the
+    # previously-"untested" operations): each cli.* candidate below was
+    # bracketed with a cli.listPages responsiveness check immediately after
+    # every hang, ruling out a global wedge masking a per-method issue.
     "delete_block": GraphOperationRoute(
-        "logseq.Editor.removeBlock", None, "untested",
-        notes="No verified cli.* deletion route; upsertNodes has no batch 'remove' operation either.",
+        "logseq.Editor.removeBlock", None, "rejected",
+        notes="logseq.cli.removeBlock hangs (HTTP 0). No batch 'remove' op in "
+        "upsertNodes either; there is no working DB deletion route yet.",
     ),
     "insert_block": GraphOperationRoute(
-        "logseq.Editor.insertBlock", None, "untested",
-        notes="Use upsert_nodes to add a block (entityType='block', data={'title','page-id','tags'}).",
+        "logseq.Editor.insertBlock", None, "rejected",
+        notes="logseq.cli.insertBlock hangs (HTTP 0). Use upsert_nodes to add a "
+        "block (entityType='block', data={'title','page-id','tags'}) instead.",
     ),
     "remove_property": GraphOperationRoute(
-        "logseq.Editor.removeProperty", None, "untested",
-        notes="No verified cli.* route to remove a property definition yet.",
+        "logseq.Editor.removeProperty", None, "rejected",
+        notes="logseq.cli.removeProperty returns HTTP 200 but is a no-op: the "
+        "property definition is unchanged afterward (confirmed via getPageData "
+        "and listProperties before/after). No working DB route to remove a "
+        "property definition.",
     ),
     "upsert_block_property": GraphOperationRoute(
-        "logseq.Editor.upsertBlockProperty", None, "untested",
-        notes="Set the property at block-creation time via upsert_nodes instead of updating it after the fact.",
+        "logseq.Editor.upsertBlockProperty", None, "rejected",
+        notes="logseq.cli.upsertBlockProperty hangs (HTTP 0). Set the property "
+        "at block-creation time via upsert_nodes instead of updating it after the fact.",
     ),
     "remove_block_property": GraphOperationRoute(
-        "logseq.Editor.removeBlockProperty", None, "untested",
-        notes="No verified cli.* route to remove a block property yet.",
+        "logseq.Editor.removeBlockProperty", None, "rejected",
+        notes="logseq.cli.removeBlockProperty hangs (HTTP 0). No working DB "
+        "route to remove a block property yet.",
     ),
     "add_block_tag": GraphOperationRoute(
-        "logseq.Editor.addBlockTag", None, "untested",
-        notes="Tag a block at creation time via upsert_nodes's 'tags' data key (array of tag UUIDs) instead.",
+        "logseq.Editor.addBlockTag", None, "rejected",
+        notes="logseq.cli.addBlockTag hangs (HTTP 0). Tag a block at creation "
+        "time via upsert_nodes's 'tags' data key (array of tag UUIDs) instead.",
     ),
     "remove_block_tag": GraphOperationRoute(
-        "logseq.Editor.removeBlockTag", None, "untested",
-        notes="No verified cli.* route to remove a tag from a block yet.",
+        "logseq.Editor.removeBlockTag", None, "rejected",
+        notes="logseq.cli.removeBlockTag hangs (HTTP 0). No working DB route "
+        "to remove a tag from a block yet.",
     ),
     "delete_page": GraphOperationRoute(
-        "logseq.Editor.deletePage", None, "untested",
-        notes="No verified cli.* route to delete a page yet; delete_page is a file-graph-only tool.",
+        "logseq.Editor.deletePage", "logseq.cli.deletePage", "verified",
+        notes="Takes the page title/name (like Editor.deletePage). Soft-deletes "
+        "(recycles) an ordinary page (sets deleted-at/deleted-by-ref); tags, "
+        "properties, and today's journal delete permanently instead -- that is "
+        "Logseq's own recycle-bin behavior, not something this client controls.",
     ),
     "rename_page": GraphOperationRoute(
-        "logseq.Editor.renamePage", None, "untested",
-        notes="No verified cli.* route to rename a page yet; rename_page is a file-graph-only tool.",
+        "logseq.Editor.renamePage", "logseq.cli.renamePage", "verified",
+        notes="Takes the page's UUID as its first argument (not its title, "
+        "unlike Editor.renamePage) -- LogSeq.rename_page resolves the name to "
+        "a UUID via get_page_data before calling this route in DB mode.",
     ),
     "get_pages_from_namespace": GraphOperationRoute(
         "logseq.Editor.getPagesFromNamespace", "logseq.cli.getPagesFromNamespace", "rejected",

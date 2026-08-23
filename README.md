@@ -254,7 +254,7 @@ therefore unavailable on DB graphs even though the tool is registered;
 | `update_page` | ✅ | |
 | `list_pages` | ✅ | ✅ |
 | `get_page_content` | ✅ | |
-| `delete_page` | ✅ | |
+| `delete_page` | ✅ | ✅ |
 | `delete_block` | ✅ | ❌ |
 | `update_block` | ✅ | ❌ |
 | `get_block` | ✅ | ⚠️ requires `page_name` |
@@ -263,7 +263,7 @@ therefore unavailable on DB graphs even though the tool is registered;
 | `find_pages_by_property` | ✅ | |
 | `get_pages_from_namespace` | ✅ | |
 | `get_pages_tree_from_namespace` | ✅ | |
-| `rename_page` | ✅ | |
+| `rename_page` | ✅ | ✅ |
 | `get_page_backlinks` | ✅ | |
 | `insert_nested_block` | ✅ | ❌ |
 | `set_block_properties` | | ❌ |

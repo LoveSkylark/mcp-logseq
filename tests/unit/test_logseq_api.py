@@ -439,10 +439,22 @@ class TestLogSeqAPI:
         with pytest.raises(ValueError, match="Page 'Non-existent' does not exist"):
             logseq_client.delete_page("Non-existent")
 
-    def test_db_delete_page_is_disabled(self, logseq_client_db):
-        """DB API deletion can corrupt page references and must not be attempted."""
-        with pytest.raises(ValueError, match="disabled for DB graphs"):
-            logseq_client_db.delete_page("Test Page")
+    @responses.activate
+    def test_db_delete_page_uses_cli_api(self, logseq_client_db):
+        """delete_page routes through cli.deletePage (live-verified soft-delete/recycle)."""
+        responses.add(
+            responses.POST,
+            "http://127.0.0.1:12315/api",
+            body="null",
+            status=200,
+            content_type="application/json",
+        )
+
+        result = logseq_client_db.delete_page("Test Page")
+
+        assert result is None
+        request_data = json.loads(responses.calls[0].request.body)
+        assert request_data == {"method": "logseq.cli.deletePage", "args": ["Test Page"]}
 
     @responses.activate
     def test_search_content_success(self, logseq_client, mock_logseq_responses):
@@ -755,6 +767,45 @@ class TestLogSeqAPI:
 
         with pytest.raises(ValueError, match="already exists"):
             logseq_client.rename_page("OldPage", "ExistingPage")
+
+    @responses.activate
+    def test_db_rename_page_resolves_uuid_first(self, logseq_client_db):
+        """DB mode: cli.renamePage (live-verified) takes a page UUID, not a title."""
+        responses.add(
+            responses.POST,
+            "http://127.0.0.1:12315/api",
+            json={"entity": {"title": "OldPage", "uuid": "page-uuid"}, "blocks": []},
+            status=200,
+        )
+        responses.add(
+            responses.POST,
+            "http://127.0.0.1:12315/api",
+            body="true",
+            status=200,
+            content_type="application/json",
+        )
+
+        result = logseq_client_db.rename_page("OldPage", "NewPage")
+
+        assert result is True
+        get_page_data_call = json.loads(responses.calls[0].request.body)
+        assert get_page_data_call == {"method": "logseq.cli.getPageData", "args": ["OldPage"]}
+        rename_call = json.loads(responses.calls[1].request.body)
+        assert rename_call == {"method": "logseq.cli.renamePage", "args": ["page-uuid", "NewPage"]}
+
+    @responses.activate
+    def test_db_rename_page_source_not_found(self, logseq_client_db):
+        """DB mode: no uuid resolved from get_page_data means the page doesn't exist."""
+        responses.add(
+            responses.POST,
+            "http://127.0.0.1:12315/api",
+            body="null",
+            status=200,
+            content_type="application/json",
+        )
+
+        with pytest.raises(ValueError, match="does not exist"):
+            logseq_client_db.rename_page("NonExistent", "NewPage")
 
     @responses.activate
     def test_get_page_linked_references_success(self, logseq_client, mock_logseq_responses):

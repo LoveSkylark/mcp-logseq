@@ -418,7 +418,11 @@ class DeletePageToolHandler(ToolHandler):
     def get_tool_description(self):
         return Tool(
             name=self.name,
-            description="Delete a page from LogSeq.",
+            description="Delete a page from LogSeq. In DB mode this soft-deletes (recycles) "
+            "an ordinary page for up to 30 days (recoverable by recreating the same page "
+            "name, or via Logseq's UI); a page that is a tag, a property, or today's "
+            "journal deletes permanently instead. This is Logseq's own recycle-bin "
+            "behavior, not something this tool controls.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -453,9 +457,16 @@ class DeletePageToolHandler(ToolHandler):
                         f"\n📋 Status: {result.get('message', 'Deletion confirmed')}"
                     )
 
-            success_msg += (
-                f"\n🗑️  Page '{page_name}' has been permanently removed from LogSeq"
-            )
+            if _tools._get_db_mode():
+                success_msg += (
+                    f"\n🗑️  Page '{page_name}' has been recycled (soft-deleted). Ordinary "
+                    "pages are recoverable for 30 days by recreating the same page name; "
+                    "tags, properties, and today's journal delete permanently instead."
+                )
+            else:
+                success_msg += (
+                    f"\n🗑️  Page '{page_name}' has been permanently removed from LogSeq"
+                )
 
             return [TextContent(type="text", text=success_msg)]
         except AccessDenied:

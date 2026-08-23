@@ -165,16 +165,33 @@ class PageMixin:
 
     def delete_page(self, page_name: str) -> Any:
         """Delete a LogSeq page by name."""
-        if self.db_mode:
-            raise ValueError(
-                "delete_page is disabled for DB graphs because the Logseq API can "
-                "flatten references to the deleted page. Delete the page in Logseq instead."
-            )
-
         url = self.get_base_url()
         logger.info(f"Deleting page '{page_name}'")
 
         try:
+            if self.db_mode:
+                # cli.deletePage (live-verified 2026-08-23) soft-deletes/recycles
+                # the page (sets deleted-at/deleted-by-ref) rather than removing
+                # it outright, matching Logseq's documented 30-day recycle
+                # behavior for ordinary pages. Tags, properties, and today's
+                # journal delete permanently instead -- that's Logseq's own
+                # behavior, not something this client controls.
+                response = self._session.post(
+                    url,
+                    headers=self._get_headers(),
+                    json={
+                        "method": self._method_for("delete_page"),
+                        "args": [page_name],
+                    },
+                    verify=self.verify_ssl,
+                    timeout=self.timeout,
+                )
+                response.raise_for_status()
+                logger.info(f"Successfully deleted page '{page_name}'")
+                if response.text and response.text.strip() and response.text.strip() != 'null':
+                    return response.json()
+                return None
+
             # Pre-delete validation: verify page exists
             existing_pages = self.list_pages()
             page_names = [
@@ -189,7 +206,7 @@ class PageMixin:
             response = self._session.post(
                 url,
                 headers=self._get_headers(),
-                json={"method": "logseq.Editor.deletePage", "args": [page_name]},
+                json={"method": self._method_for("delete_page"), "args": [page_name]},
                 verify=self.verify_ssl,
                 timeout=self.timeout,
             )
@@ -710,6 +727,28 @@ class PageMixin:
         logger.info(f"Renaming page '{old_name}' to '{new_name}'")
 
         try:
+            if self.db_mode:
+                # cli.renamePage (live-verified 2026-08-23) takes the page's
+                # UUID as its first argument, not its title.
+                page_data = self.get_page_data(old_name)
+                page_uuid = ((page_data or {}).get("entity") or {}).get("uuid")
+                if not page_uuid:
+                    raise ValueError(f"Page '{old_name}' does not exist")
+                response = self._session.post(
+                    url,
+                    headers=self._get_headers(),
+                    json={
+                        "method": self._method_for("rename_page"),
+                        "args": [page_uuid, new_name],
+                    },
+                    verify=self.verify_ssl,
+                    timeout=self.timeout,
+                )
+                response.raise_for_status()
+                if response.text and response.text.strip() and response.text.strip() != 'null':
+                    return response.json()
+                return None
+
             # Validate old page exists
             existing_pages = self.list_pages()
             page_names = [p.get("originalName") or p.get("name") for p in existing_pages]
