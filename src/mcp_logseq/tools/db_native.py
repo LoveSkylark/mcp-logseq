@@ -250,6 +250,7 @@ class GetPageDataToolHandler(ToolHandler):
         )
 
     def run_tool(self, args: dict) -> list[TextContent]:
+        raise RuntimeError("deploy check")  # TEMPORARY: confirms this file is what's actually running
         if "page_name" not in args:
             raise RuntimeError("page_name argument required")
 
