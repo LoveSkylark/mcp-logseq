@@ -93,12 +93,13 @@ reorganization.
 
 1. Use `search_blocks` to find distinctive content and collect page/block UUIDs.
   Read `content` rather than highlighted search titles.
-2. Use `get_page_data` to obtain the page entity and its direct page-level
-  blocks. Pass `expand_children=true` to also fetch each top-level block's
-  nested tree in this same call, instead of fanning out one `get_block` call
-  per top-level block yourself. A block whose subtree is too large to expand
-  gets a `children_error` key instead of failing the whole page read -- retry
-  just that one block with `get_block` if you need it.
+2. Use `get_page_data` to obtain the page entity and its blocks, nested
+  children included by default (`expand_children` defaults to `true`, so a
+  normal call already reads the whole page -- no per-block fan-out needed). A
+  block whose subtree is too large to expand gets a `children_error` key
+  instead of failing the whole page read; retry just that one block with
+  `get_block` if you need it. Pass `expand_children=false` only when you
+  specifically want the faster flat top-level-only list.
 3. Normalize relevant nodes in memory: retain each block's UUID, title/content,
   parent, children, tags, and typed properties. Do not infer a relationship
   from display text when a UUID is available.
@@ -194,12 +195,12 @@ When using DB queries or interpreting DB page data, use DB schema names:
 Similarly, use DB DSL forms such as `(property key)` and `(tags tag)` rather
 than file-graph forms such as `(page-property key)` and `(page-tags tag)`.
 
-`get_page_data` returns the page entity and its direct page-level blocks with
-no nested tree by default. Pass `expand_children=true` to fetch each top-level
-block's full nested children in the same call (a very large subtree may still
-time out; it reports a `children_error` on just that block rather than
-failing the read). Without that flag, or for a single known nested block, use
-`get_block` with `include_children=true` directly.
+`get_page_data` includes each top-level block's full nested children by
+default (`expand_children` defaults to `true`; a very large subtree may still
+time out, reporting a `children_error` on just that block rather than failing
+the read). `get_page_content` inherits the same default. For a single known
+nested block on its own, `get_block` with `include_children=true` also works
+directly.
 
 ## Minimal-diff rules
 

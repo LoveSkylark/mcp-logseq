@@ -409,6 +409,29 @@ class TestFeatureFlagIntegration:
             assert body["method"] != "logseq.DB.datascriptQuery"
 
     @responses.activate
+    @patch.dict("os.environ", {"LOGSEQ_API_TOKEN": "test_token", "LOGSEQ_DB_MODE": "true"})
+    def test_get_page_content_db_mode_expands_children_by_default(self):
+        """get_page_content's DB-mode read must not require a separate
+        get_block call per top-level block to see nested content."""
+        api_url = "http://localhost:12315/api"
+        responses.add(responses.POST, api_url, json={
+            "entity": {"title": "Test Page", "uuid": "page-uuid"},
+            "blocks": [{"uuid": "block-1", "title": "Top block"}],
+        }, status=200)
+        responses.add(responses.POST, api_url, json={
+            "uuid": "block-1", "content": "Top block",
+            "children": [{"uuid": "child-1", "content": "Nested child", "children": []}],
+        }, status=200)
+
+        handler = GetPageContentToolHandler()
+        with patch("mcp_logseq.tools._get_db_mode", return_value=True):
+            result = handler.run_tool({"page_name": "Test Page"})
+
+        assert "Nested child" in result[0].text
+        second_call_body = json.loads(responses.calls[1].request.body)
+        assert second_call_body["method"] == "logseq.cli.getBlock"
+
+    @responses.activate
     def test_set_block_properties_blocked_without_flag(self):
         """set_block_properties returns error when LOGSEQ_DB_MODE is off."""
         from mcp_logseq.tools import SetBlockPropertiesToolHandler

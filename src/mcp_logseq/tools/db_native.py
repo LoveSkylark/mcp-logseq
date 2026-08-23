@@ -231,16 +231,18 @@ class GetPageDataToolHandler(ToolHandler):
                     "expand_children": {
                         "type": "boolean",
                         "description": (
-                            "When true, also fetch each top-level block's nested "
+                            "Whether to also fetch each top-level block's nested "
                             "children (get_page_data alone never returns them -- "
-                            "it only lists direct page-level blocks). Bundles what "
-                            "would otherwise be one get_block call per top-level "
-                            "block into this single response. A block whose "
+                            "it only lists direct page-level blocks). Defaults to "
+                            "true so a normal call reads the whole page, including "
+                            "nested content, in one response. A block whose "
                             "subtree is too large to expand gets a "
                             "'children_error' key instead of failing the whole "
-                            "read; retry just that block with get_block if needed."
+                            "read; retry just that block with get_block if needed. "
+                            "Set to false only when you specifically want the "
+                            "faster flat top-level-only list."
                         ),
-                        "default": False,
+                        "default": True,
                     },
                 },
                 "required": ["page_name"],
@@ -261,7 +263,7 @@ class GetPageDataToolHandler(ToolHandler):
         try:
             api = _tools._make_api()
             result = api.get_page_data(
-                args["page_name"], expand_children=bool(args.get("expand_children", False))
+                args["page_name"], expand_children=bool(args.get("expand_children", True))
             )
             if isinstance(result, dict):
                 entity = result.get("entity") or result.get("page") or {}

@@ -313,7 +313,7 @@ class GetPageContentToolHandler(ToolHandler):
         try:
             api = _tools._make_api()
             if _tools._get_db_mode() and getattr(api, "db_mode", False) is True:
-                raw_result = api.get_page_data(args["page_name"])
+                raw_result = api.get_page_data(args["page_name"], expand_children=True)
                 if not isinstance(raw_result, dict):
                     return [TextContent(
                         type="text", text=f"Page '{args['page_name']}' not found."
