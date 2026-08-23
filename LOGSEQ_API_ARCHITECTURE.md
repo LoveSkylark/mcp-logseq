@@ -51,6 +51,28 @@ The verified DB CLI endpoints are `getPageData`, `listPages`, `listTags`,
 remain compatibility code and are not considered valid DB-mode mutation paths
 until verified against the target Logseq release.
 
+### Operation Route Map
+
+`LOGSEQ_DB_MODE` selects an explicit operation route map. It does not perform a
+blind string replacement from `logseq.Editor.*` to `logseq.cli.*`, because an
+alias can accept a request while still requiring different arguments or exposing
+unsafe behavior.
+
+Each logical operation records its file method, DB method, DB verification
+status, and any temporary fallback. Verified DB entries are enabled immediately.
+Candidate entries keep their existing fallback until live tests confirm the
+method, payload, response shape, repeated-call behavior, and read-back result.
+
+Export the current map for the Windows DB test lab with:
+
+```bash
+python scripts/export-db-route-manifest.py
+```
+
+Promote a candidate only after the DB harness records a successful scenario.
+This keeps file behavior stable while allowing the DB adapter to migrate one
+operation at a time.
+
 The Python MCP process reuses one `requests.Session` for all calls made through
 the same configured Logseq endpoint, token, timeout, and graph mode. This is a
 process-local connection pool; separate MCP processes or different endpoint

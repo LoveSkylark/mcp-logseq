@@ -1,8 +1,58 @@
 import requests
 import logging
+from dataclasses import asdict, dataclass
 from typing import Any
 
 logger = logging.getLogger("mcp-logseq")
+
+
+@dataclass(frozen=True)
+class GraphOperationRoute:
+    """Method mapping for one logical MCP operation across graph models."""
+
+    file_method: str | None
+    db_method: str | None
+    db_status: str
+    db_fallback_method: str | None = None
+    notes: str = ""
+
+
+GRAPH_OPERATION_ROUTES: dict[str, GraphOperationRoute] = {
+    "list_pages": GraphOperationRoute(
+        "logseq.Editor.getAllPages", "logseq.cli.listPages", "verified"
+    ),
+    "list_tags": GraphOperationRoute(
+        None, "logseq.cli.listTags", "verified"
+    ),
+    "list_properties": GraphOperationRoute(
+        None, "logseq.cli.listProperties", "verified"
+    ),
+    "search": GraphOperationRoute(
+        "logseq.App.search", "logseq.app.search", "verified"
+    ),
+    "get_page_data": GraphOperationRoute(
+        None, "logseq.cli.getPageData", "verified"
+    ),
+    "upsert_nodes": GraphOperationRoute(
+        None, "logseq.cli.upsertNodes", "verified"
+    ),
+    # The DB CLI aliases below are intentionally not enabled until the live
+    # harness proves their argument and response contracts.
+    "get_block": GraphOperationRoute(
+        "logseq.Editor.getBlock",
+        "logseq.cli.getBlock",
+        "candidate",
+        db_fallback_method="logseq.Editor.getBlock",
+        notes="Candidate DB CLI mapping; retain the verified Editor fallback until live-tested.",
+    ),
+    "get_block_properties": GraphOperationRoute(
+        "logseq.Editor.getBlockProperties",
+        "logseq.cli.getBlockProperties",
+        "candidate",
+        db_fallback_method="logseq.Editor.getBlockProperties",
+        notes="Candidate DB CLI mapping; retain the existing fallback until live-tested.",
+    ),
+}
 
 
 class LogSeq:
@@ -40,6 +90,35 @@ class LogSeq:
 
     def _get_headers(self) -> dict:
         return {"Authorization": f"Bearer {self.api_key}"}
+
+    @classmethod
+    def api_route_manifest(cls) -> dict[str, dict[str, str | None]]:
+        """Return the graph-operation map for tests and external harnesses."""
+        return {operation: asdict(route) for operation, route in GRAPH_OPERATION_ROUTES.items()}
+
+    def _method_for(self, operation: str) -> str:
+        """Resolve the currently enabled HTTP method for a logical operation."""
+        try:
+            route = GRAPH_OPERATION_ROUTES[operation]
+        except KeyError as error:
+            raise ValueError(f"Unknown graph operation: {operation}") from error
+
+        if not self.db_mode:
+            if route.file_method is None:
+                raise RuntimeError(f"{operation} is available only for DB graphs")
+            return route.file_method
+
+        if route.db_status == "verified" and route.db_method:
+            return route.db_method
+        if route.db_fallback_method:
+            logger.warning(
+                "DB route %s is %s; using fallback %s until live verification succeeds",
+                operation,
+                route.db_status,
+                route.db_fallback_method,
+            )
+            return route.db_fallback_method
+        raise RuntimeError(f"{operation} has no enabled DB route")
 
     def _call_api(self, method: str, args: list) -> Any:
         response = self._session.post(
@@ -134,7 +213,7 @@ class LogSeq:
         logger.info("Listing pages")
 
         try:
-            method = "logseq.cli.listPages" if self.db_mode else "logseq.Editor.getAllPages"
+            method = self._method_for("list_pages")
             args = [{"expand": expand}] if self.db_mode else []
             response = self._session.post(
                 url,
@@ -177,7 +256,7 @@ class LogSeq:
             response = self._session.post(
                 url,
                 headers=self._get_headers(),
-                json={"method": "logseq.cli.listTags", "args": [{"expand": expand}]},
+                json={"method": self._method_for("list_tags"), "args": [{"expand": expand}]},
                 verify=self.verify_ssl,
                 timeout=self.timeout,
             )
@@ -196,7 +275,7 @@ class LogSeq:
             response = self._session.post(
                 url,
                 headers=self._get_headers(),
-                json={"method": "logseq.cli.listProperties", "args": [{"expand": expand}]},
+                json={"method": self._method_for("list_properties"), "args": [{"expand": expand}]},
                 verify=self.verify_ssl,
                 timeout=self.timeout,
             )
@@ -221,7 +300,7 @@ class LogSeq:
         return self._call_api("logseq.Editor.removeProperty", [property_name])
 
     def get_block_properties(self, block_uuid: str) -> Any:
-        return self._call_api("logseq.Editor.getBlockProperties", [block_uuid])
+        return self._call_api(self._method_for("get_block_properties"), [block_uuid])
 
     def get_block_property(self, block_uuid: str, property_name: str) -> Any:
         return self._call_api(
@@ -335,9 +414,8 @@ class LogSeq:
         url = self.get_base_url()
         logger.info(f"Searching for '{query}'")
 
-        # DB graphs expose the lowercase app API used by Logseq's native MCP server.
         search_options = options or {}
-        method = "logseq.app.search" if self.db_mode else "logseq.App.search"
+        method = self._method_for("search")
         if self.db_mode and not options:
             search_options = {"enable-snippet?": False}
 
@@ -1282,7 +1360,7 @@ class LogSeq:
                 url,
                 headers=self._get_headers(),
                 json={
-                    "method": "logseq.Editor.getBlock",
+                    "method": self._method_for("get_block"),
                     "args": [block_uuid, {"includeChildren": include_children}],
                 },
                 verify=self.verify_ssl,
@@ -1651,13 +1729,13 @@ class LogSeq:
                 url,
                 headers=self._get_headers(),
                 json={
-                    "method": "logseq.cli.upsertNodes",
+                    "method": self._method_for("upsert_nodes"),
                     "args": [operations, {"dry-run": bool(dry_run)}],
                 },
                 verify=self.verify_ssl,
                 timeout=self.timeout,
             )
-            self._raise_for_status_verbose(response, "logseq.cli.upsertNodes")
+            self._raise_for_status_verbose(response, self._method_for("upsert_nodes"))
             try:
                 return response.json()
             except ValueError:
@@ -1680,13 +1758,13 @@ class LogSeq:
                 url,
                 headers=self._get_headers(),
                 json={
-                    "method": "logseq.cli.getPageData",
+                    "method": self._method_for("get_page_data"),
                     "args": [page_name],
                 },
                 verify=self.verify_ssl,
                 timeout=self.timeout,
             )
-            self._raise_for_status_verbose(response, "logseq.cli.getPageData")
+            self._raise_for_status_verbose(response, self._method_for("get_page_data"))
             try:
                 return response.json()
             except ValueError:

@@ -1,0 +1,85 @@
+**Fresh-Chat Handoff**
+
+We are on branch:
+
+```text
+experiment/db-cli-mapping
+```
+
+The project now passes:
+
+```text
+LOGSEQ_API_TOKEN=test .venv-mcp2/bin/python -m pytest -q
+683 passed
+```
+
+The earlier `686 passed` count was before subsequent Bucket B changes; use the command above as the current baseline when resuming.
+
+**Goal**
+
+Rebuild DB-graph support around explicit DB-native routing:
+
+```text
+file graph -> logseq.Editor.* + Markdown semantics
+DB graph   -> logseq.cli.* / logseq.app.* + DB-node semantics
+```
+
+Do not blindly replace `Editor` with `cli`. Use the explicit route map in `logseq.py`, then promote each DB CLI candidate only after live Logseq 2.0.1 testing confirms method, payload, response shape, repeated-call behavior, and read-back.
+
+**Completed**
+
+- Added explicit graph operation routes:
+  - Verified DB: `listPages`, `listTags`, `listProperties`, `app.search`, `getPageData`, `upsertNodes`.
+  - Candidates: `cli.getBlock`, `cli.getBlockProperties`; currently retain `Editor.*` fallbacks.
+- Added `export-db-route-manifest.py`.
+- Added/extended `test-logseq-db-api.ps1` for isolated CLI candidate tests.
+- Fixed DB bare-field normalization:
+  - `list_pages` accepts bare `title`/`name`.
+  - DB blocks accept bare `title`.
+- `get_page_data` is documented as page-level blocks only, not a recursive tree.
+- Added DB property ident support for `:user.property/*`, `:logseq.property/*`, `:plugin.property.*`, and explicit ident passthrough.
+- Added strict `upsert_nodes` key validation. Set `LOGSEQ_UPSERT_STRICT=false` only for future API experiments.
+- Improved DB API error messages by preserving Logseq HTTP response bodies.
+- Added `list_pages.expand`.
+- Fixed read-only registration so tag relationship writes are unavailable in `--read-only`.
+- Split and renamed skills:
+  - `logseq-db-graph`
+  - `logseq-file-graph`
+
+**Live Evidence**
+
+- `logseq.Editor.upsertBlockProperty` on a real DB block timed out after 20 seconds.
+- Treat direct DB `Editor.*` property mutation as unsafe until proven otherwise.
+- `getBlock(includeChildren=false)` is a known hang.
+- `getPageData` does not provide a guaranteed nested tree.
+- `logseq.cli.search`, `listProperties`, and `listTags` work in the live graph.
+
+**Next Work**
+
+1. Run the Windows harness:
+   ```powershell
+   & "C:\Users\sstef\test-logseq-db-api.ps1" -Suite Core -Token "TOKEN"
+   ```
+2. Restart Logseq before each isolated candidate:
+   ```powershell
+   -Suite CliGetBlockTrue
+   -Suite CliGetBlockFalse
+   -Suite CliGetBlockProperties
+   ```
+3. Record HTTP status, time, result shape, and whether the next call works.
+4. Promote verified candidates in `GRAPH_OPERATION_ROUTES`; remove unsafe fallbacks from forced DB mode.
+5. Decide B8 architecture only after live results:
+   - direct `Editor.*` DB property/tag tools may create plugin-namespaced entities or hang;
+   - `upsert_nodes` is flat-only and cannot create parent hierarchy.
+6. Consider bounded pagination for `get_page_data`, `search_blocks`, `list_tags`, and `list_properties`.
+
+**Important Files**
+
+- `logseq.py`: routing map and HTTP client.
+- `server.py`: forced DB/file tool profiles.
+- `tools.py`: tool handlers and DB validation.
+- `test-logseq-db-api.ps1`: live DB harness.
+- `LOGSEQ_API_ARCHITECTURE.md`: route-map policy.
+- `SKILL.md`: DB operational rules.
+
+Start the new chat by pasting this summary and the latest Windows harness output.

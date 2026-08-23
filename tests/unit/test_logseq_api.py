@@ -9,6 +9,25 @@ from mcp_logseq.logseq import LogSeq
 class TestLogSeqAPI:
     """Test cases for the LogSeq API client."""
 
+    def test_route_manifest_marks_verified_and_candidate_db_methods(self, mock_api_key):
+        manifest = LogSeq.api_route_manifest()
+
+        assert manifest["list_pages"]["db_method"] == "logseq.cli.listPages"
+        assert manifest["list_pages"]["db_status"] == "verified"
+        assert manifest["get_block"]["db_method"] == "logseq.cli.getBlock"
+        assert manifest["get_block"]["db_status"] == "candidate"
+
+    def test_db_route_uses_verified_cli_method(self, mock_api_key):
+        client = LogSeq(api_key=mock_api_key, db_mode=True)
+
+        assert client._method_for("list_pages") == "logseq.cli.listPages"
+        assert client._method_for("search") == "logseq.app.search"
+
+    def test_db_candidate_route_keeps_fallback_until_verified(self, mock_api_key):
+        client = LogSeq(api_key=mock_api_key, db_mode=True)
+
+        assert client._method_for("get_block") == "logseq.Editor.getBlock"
+
     def test_init_with_defaults(self, mock_api_key):
         """Test LogSeq client initialization with default parameters."""
         client = LogSeq(api_key=mock_api_key)
