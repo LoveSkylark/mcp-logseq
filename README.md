@@ -221,12 +221,11 @@ unsupported one fails at call time with an "available only for..." /
 "not available for Logseq DB graphs" message.
 
 DB graphs use `logseq.cli.*` exclusively — there is **no fallback** to
-`logseq.Editor.*` when a `cli.*` route hangs or errors. `add_tag_extends`/
-`remove_tag_extends` and page creation (`create_page`) have no verified
-`cli.*` equivalent yet; `upsert_nodes` is the reliable DB write path for those
-cases. `Editor.*` writes can also wedge after several calls in one session
-and need a Logseq restart to recover — see the note below the table before
-concluding a route is broken from a single test.
+`logseq.Editor.*` when a `cli.*` route hangs or errors. Page creation
+(`create_page`) has no verified `cli.*` equivalent yet; `upsert_nodes` is the
+reliable DB write path for that case. `Editor.*` writes can also wedge after
+several calls in one session and need a Logseq restart to recover — see the
+note below the table before concluding a route is broken from a single test.
 
 | Tool | File | DB |
 | --- | :---: | :---: |
@@ -250,8 +249,8 @@ concluding a route is broken from a single test.
 | `remove_block_tag` | | ✅ |
 | `add_tag_property` | | ✅ |
 | `remove_tag_property` | | ✅ |
-| `add_tag_extends` | | ❌ |
-| `remove_tag_extends` | | ❌ |
+| `add_tag_extends` | | ✅ |
+| `remove_tag_extends` | | ✅ |
 | `create_page` | ✅ | |
 | `update_page` | ✅ | |
 | `list_pages` | ✅ | ✅ |

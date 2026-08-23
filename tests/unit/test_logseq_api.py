@@ -32,13 +32,13 @@ class TestLogSeqAPI:
             ("remove_tag_property", "logseq.cli.removeTagProperty"),
             ("get_block_property", "logseq.cli.getBlockProperty"),
             ("update_block", "logseq.cli.updateBlock"),
+            ("add_tag_extends", "logseq.cli.addTagExtends"),
+            ("remove_tag_extends", "logseq.cli.removeTagExtends"),
         ):
             assert manifest[operation]["db_method"] == method
             assert manifest[operation]["db_status"] == "verified"
 
         for operation, method in (
-            ("add_tag_extends", "logseq.cli.addTagExtends"),
-            ("remove_tag_extends", "logseq.cli.removeTagExtends"),
             ("create_page", "logseq.cli.createPage"),
         ):
             assert manifest[operation]["db_method"] == method
@@ -57,9 +57,6 @@ class TestLogSeqAPI:
 
         with pytest.raises(RuntimeError, match="create_page is not available for Logseq DB graphs"):
             client._method_for("create_page")
-
-        with pytest.raises(RuntimeError, match="add_tag_extends is not available for Logseq DB graphs"):
-            client._method_for("add_tag_extends")
 
     def test_init_with_defaults(self, mock_api_key):
         """Test LogSeq client initialization with default parameters."""

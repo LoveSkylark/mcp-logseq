@@ -87,12 +87,17 @@ GRAPH_OPERATION_ROUTES: dict[str, GraphOperationRoute] = {
         "succeeded instantly on a fresh Logseq restart.",
     ),
     "add_tag_extends": GraphOperationRoute(
-        "logseq.Editor.addTagExtends", "logseq.cli.addTagExtends", "rejected",
-        notes="logseq.cli.addTagExtends hangs (HTTP 0) with tag-only arguments.",
+        "logseq.Editor.addTagExtends", "logseq.cli.addTagExtends", "verified",
+        notes="Live-tested 2026-08-23: the earlier hang was a wedged Editor.* write "
+        "session (see delete_block); on a fresh retest this succeeded instantly, "
+        "confirmed by reading the child tag's :logseq.property.class/extends "
+        "attribute afterward.",
     ),
     "remove_tag_extends": GraphOperationRoute(
-        "logseq.Editor.removeTagExtends", "logseq.cli.removeTagExtends", "rejected",
-        notes="logseq.cli.removeTagExtends hangs (HTTP 0).",
+        "logseq.Editor.removeTagExtends", "logseq.cli.removeTagExtends", "verified",
+        notes="Live-tested 2026-08-23: same wedge false-negative as add_tag_extends; "
+        "on a fresh retest this succeeded instantly, resetting the tag's "
+        ":logseq.property.class/extends back to Root Tag as confirmed by read-back.",
     ),
     "update_block": GraphOperationRoute(
         "logseq.Editor.updateBlock", "logseq.cli.updateBlock", "verified",
