@@ -75,7 +75,7 @@ function Get-ObjectValue {
 function Invoke-LogseqApi {
     param(
         [Parameter(Mandatory = $true)][string]$Method,
-        [Parameter(Mandatory = $true)][object[]]$Arguments
+        [Parameter(Mandatory = $true)][AllowEmptyCollection()][object[]]$Arguments
     )
 
     $requestPath = Join-Path $env:TEMP ("logseq-request-{0}.json" -f [guid]::NewGuid())

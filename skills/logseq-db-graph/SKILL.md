@@ -1,5 +1,5 @@
 ---
-name: claude-desktop-logseq-db
+name: logseq-db-graph
 description: Detailed rules for safely reading, planning, and writing a Logseq 2.0.x DB graph through mcp-logseq. Use UUIDs, typed properties, DB-native page data, and validated upsert batches. Never use Markdown file-graph workflows.
 ---
 

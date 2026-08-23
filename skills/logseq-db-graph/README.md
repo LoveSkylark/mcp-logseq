@@ -1,23 +1,23 @@
-# Install the File Graph Skill
+# Install the DB Graph Skill
 
 Import this folder into Claude Desktop Skills:
 
 ```text
-/absolute/path/to/mcp-logseq/skills/claude-desktop-logseq-file
+/absolute/path/to/mcp-logseq/skills/logseq-db-graph
 ```
 
-Configure a dedicated legacy file-graph MCP server. Do not set
-`LOGSEQ_DB_MODE=auto` for this skill.
+Configure a dedicated DB-graph MCP server. Do not set `LOGSEQ_DB_MODE=auto` for
+this skill.
 
 ```json
 {
   "mcpServers": {
-    "logseq-file": {
+    "logseq-db": {
       "command": "/absolute/path/to/uvx",
       "args": ["--with", "mcp>=2,<3", "mcp-logseq"],
       "env": {
         "LOGSEQ_API_TOKEN": "your-logseq-api-token",
-        "LOGSEQ_DB_MODE": "false",
+        "LOGSEQ_DB_MODE": "true",
         "LOGSEQ_API_CONNECT_TIMEOUT": "10",
         "LOGSEQ_API_READ_TIMEOUT": "60",
         "MCP_READ_TOOL_TIMEOUT": "90",

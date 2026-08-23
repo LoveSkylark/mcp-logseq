@@ -1,5 +1,5 @@
 ---
-name: claude-desktop-logseq-file
+name: logseq-file-graph
 description: Detailed rules for safely reading, planning, and writing legacy Logseq Markdown/file graphs through mcp-logseq. Use Markdown pages, key:: value properties, page names, and targeted Editor-backed tools. Never use DB-node workflows.
 ---
 

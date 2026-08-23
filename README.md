@@ -111,8 +111,8 @@ not import both skills into the same conversation.
 
 | Graph type | Skill and configuration |
 | --- | --- |
-| Logseq 2.x DB graph | [DB graph skill](skills/claude-desktop-logseq-db/README.md) with `LOGSEQ_DB_MODE=true` |
-| Legacy Markdown/file graph | [File graph skill](skills/claude-desktop-logseq-file/README.md) with `LOGSEQ_DB_MODE=false` |
+| Logseq 2.x DB graph | [DB graph skill](skills/logseq-db-graph/README.md) with `LOGSEQ_DB_MODE=true` |
+| Legacy Markdown/file graph | [File graph skill](skills/logseq-file-graph/README.md) with `LOGSEQ_DB_MODE=false` |
 
 The skills contain the safe read/write workflow, markup rules, schema details,
 and the exact Claude Desktop configuration. Use `LOGSEQ_DB_MODE=auto` only for
@@ -213,9 +213,9 @@ equivalent.
 
 The two skills are the authoritative tool and workflow guides:
 
-- [File graph skill](skills/claude-desktop-logseq-file/SKILL.md): Markdown,
+- [File graph skill](skills/logseq-file-graph/SKILL.md): Markdown,
   namespaces, file properties, and Editor-backed operations.
-- [DB graph skill](skills/claude-desktop-logseq-db/SKILL.md): UUIDs, typed
+- [DB graph skill](skills/logseq-db-graph/SKILL.md): UUIDs, typed
   properties, safe DB reads, dry-run validation, and `upsert_nodes` batches.
 
 For the full API surface and Logseq 2.0.1 namespace behavior, see
