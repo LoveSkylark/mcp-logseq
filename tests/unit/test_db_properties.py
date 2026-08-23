@@ -163,6 +163,35 @@ class TestGetBlocksDbProperties:
         result = logseq_client.get_blocks_db_properties([])
         assert result == {}
 
+    def test_captures_bare_builtin_idents(self, logseq_client, db_blocks):
+        """Built-in properties (e.g. Alias) print as a bare keyword with no
+        leading colon and must still be captured and resolved via the static
+        display-name fallback (their :db/ident value never resolves via a
+        reverse lookup query), while ordinary structural attributes on the
+        same block are excluded."""
+
+        def mock_query(query):
+            if "[101 ?a ?v]" in query:
+                return [
+                    ["alias", 201],
+                    ["title", "First block"],
+                    ["parent", 100],
+                    ["page", 100],
+                    ["order", "a1"],
+                    ["tags", 4],
+                ]
+            for bid in (102, 103):
+                if f"[{bid} ?a ?v]" in query:
+                    return []
+            if "or" in query.lower():
+                return [[201, "title", "hello"]]
+            return []
+
+        with patch.object(logseq_client, "datascript_query", side_effect=mock_query):
+            result = logseq_client.get_blocks_db_properties(db_blocks)
+
+        assert result == {"uuid-block-1": {"Alias": "hello"}}
+
     def test_batched_reduces_query_count(self, logseq_client, db_blocks):
         """Batched approach uses significantly fewer queries than N+1."""
         query_count = 0

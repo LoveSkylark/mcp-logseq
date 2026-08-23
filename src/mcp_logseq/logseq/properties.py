@@ -235,9 +235,15 @@ class PropertyMixin:
         Returns:
             Dict of {ident: entity_id}
         """
-        if not idents:
+        # Live-confirmed: a bare/unqualified ident (e.g. :alias, :tags) never
+        # matches as a literal query value here even though the same value
+        # resolves fine in the forward direction ([eid :db/ident ?v]) -- only
+        # namespaced idents (:user.property/*, :logseq.property/*) match.
+        # Skip them; get_blocks_db_properties falls back to _BUILTIN_IDENT_TITLES.
+        namespaced_idents = {ident for ident in idents if "/" in ident}
+        if not namespaced_idents:
             return {}
-        or_clauses = " ".join(f'[?id :db/ident {ident}]' for ident in idents)
+        or_clauses = " ".join(f'[?id :db/ident {ident}]' for ident in namespaced_idents)
         query = f'[:find ?id ?ident :where (or {or_clauses}) [?id :db/ident ?ident]]'
         try:
             result = self.datascript_query(query)
@@ -266,7 +272,14 @@ class PropertyMixin:
         """
         if not entity_ids:
             return {}
-        or_clauses = " ".join(f'[{eid} ?a ?v]' for eid in entity_ids)
+        # Live-confirmed bug fix: `[{eid} ?a ?v]` never binds ?eid (it's a
+        # literal entity id, not a var), so the old query always errored with
+        # "Query for unknown vars: [?eid]" and silently fell through to the
+        # N-query fallback below on every call. Ground each eid to ?eid via
+        # `identity` so it actually binds and the batch query itself works.
+        or_clauses = " ".join(
+            f'(and [(identity {eid}) ?eid] [?eid ?a ?v])' for eid in entity_ids
+        )
         query = f'[:find ?eid ?a ?v :where (or {or_clauses})]'
         try:
             results = self.datascript_query(query)
@@ -285,12 +298,31 @@ class PropertyMixin:
                     titles[eid] = title
             return titles
 
+    # Structural/bookkeeping attributes every node entity carries that are
+    # never themselves a user-visible property. Datascript prints unqualified
+    # keywords (e.g. :tags, :alias) without their leading colon, so these are
+    # bare on purpose -- see the colon-normalization below for why that
+    # matters for property idents too.
+    _NON_PROPERTY_BLOCK_ATTRS = frozenset({
+        "uuid", "title", "name", "created-at", "updated-at", "tx-id", "order",
+        "parent", "page", "refs", "tags", "level", "collapsed?", "index",
+        ":logseq.property/created-by-ref",
+        ":logseq.property/created-from-property",
+    })
+
+    # Display names for common built-in bare idents, since :db/ident reverse
+    # lookups can't resolve them (see _resolve_idents_batch).
+    _BUILTIN_IDENT_TITLES = {
+        "alias": "Alias", "status": "Status", "priority": "Priority",
+        "deadline": "Deadline", "scheduled": "Scheduled", "icon": "Icon",
+    }
+
     def get_blocks_db_properties(self, blocks: list[dict]) -> dict[str, dict[str, str]]:
         """Get DB-mode properties for a list of blocks (from getPageBlocksTree).
 
         Batched approach to minimize API round-trips:
         1. Per block: query attributes (1 call per block)
-        2. Batch resolve all :user.property/* idents to entity IDs (1 call)
+        2. Batch resolve all property idents to entity IDs (1 call)
         3. Batch resolve all entity titles (property names + values) (1 call)
 
         Args:
@@ -314,8 +346,15 @@ class PropertyMixin:
                         attrs = []
                     user_props = {}
                     for attr, val in attrs:
-                        if isinstance(attr, str) and attr.startswith(":user.property/"):
-                            user_props[attr] = val
+                        if not isinstance(attr, str) or attr in self._NON_PROPERTY_BLOCK_ATTRS:
+                            continue
+                        # Built-in properties (e.g. "alias") print as a bare
+                        # keyword with no colon; namespaced idents (e.g.
+                        # ":user.property/Foo-xyz", ":logseq.property/status")
+                        # already have one. Normalize so both forms resolve
+                        # the same way via :db/ident lookups below.
+                        ident = attr if attr.startswith(":") else f":{attr}"
+                        user_props[ident] = val
                     if user_props:
                         block_props[block_uuid] = user_props
                 collect_attrs(block.get("children", []))
@@ -329,6 +368,7 @@ class PropertyMixin:
         all_idents = set()
         for props in block_props.values():
             all_idents.update(props.keys())
+
 
         ident_to_eid = self._resolve_idents_batch(all_idents)
 
@@ -347,10 +387,13 @@ class PropertyMixin:
         for block_uuid, props in block_props.items():
             resolved = {}
             for ident, val in props.items():
-                # Property name: ident -> entity ID -> title
+                # Property name: ident -> entity ID -> title, falling back to
+                # the built-in display name map for bare idents (:alias etc.)
+                # that _resolve_idents_batch can never look up, then the raw
+                # ident as a last resort.
                 prop_eid = ident_to_eid.get(ident)
                 prop_name = titles.get(prop_eid) if prop_eid else None
-                prop_name = prop_name or ident
+                prop_name = prop_name or self._BUILTIN_IDENT_TITLES.get(ident.lstrip(":")) or ident
 
                 # Value: entity ref -> title, or string as-is
                 if isinstance(val, int):
