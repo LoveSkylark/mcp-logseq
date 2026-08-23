@@ -1942,17 +1942,16 @@ class TestGetBlockToolHandler:
     @patch.dict("os.environ", {"LOGSEQ_API_TOKEN": "test_token", "LOGSEQ_DB_MODE": "true"})
     @patch("mcp_logseq.tools.logseq.LogSeq")
     def test_db_run_tool_without_page_name_raises(self, mock_logseq_class):
-        """DB mode without page_name has no working get_block route at all."""
+        """DB mode without page_name is rejected up front, before any API call --
+        get_block has no working DB route at all."""
         mock_api = Mock()
-        mock_api.get_block.side_effect = RuntimeError(
-            "get_block is not available for Logseq DB graphs (db_status=rejected)"
-        )
         mock_logseq_class.return_value = mock_api
 
         handler = GetBlockToolHandler()
         result = handler.run_tool({"block_uuid": "abc-123"})
 
-        assert "not available for Logseq DB graphs" in result[0].text
+        mock_api.get_block.assert_not_called()
+        assert "requires page_name in DB mode" in result[0].text
 
     @patch.dict("os.environ", {"LOGSEQ_API_TOKEN": "test_token"})
     def test_run_tool_missing_block_uuid(self):

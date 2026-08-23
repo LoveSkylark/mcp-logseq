@@ -107,31 +107,40 @@ GRAPH_OPERATION_ROUTES: dict[str, GraphOperationRoute] = {
     # Not yet live-tested against a cli.* candidate. Unavailable on DB graphs
     # until verified — no fallback to Editor.* under the hard File/DB split.
     "delete_block": GraphOperationRoute(
-        "logseq.Editor.removeBlock", None, "untested"
+        "logseq.Editor.removeBlock", None, "untested",
+        notes="No verified cli.* deletion route; upsertNodes has no batch 'remove' operation either.",
     ),
     "insert_block": GraphOperationRoute(
-        "logseq.Editor.insertBlock", None, "untested"
+        "logseq.Editor.insertBlock", None, "untested",
+        notes="Use upsert_nodes to add a block (entityType='block', data={'title','page-id','tags'}).",
     ),
     "remove_property": GraphOperationRoute(
-        "logseq.Editor.removeProperty", None, "untested"
+        "logseq.Editor.removeProperty", None, "untested",
+        notes="No verified cli.* route to remove a property definition yet.",
     ),
     "upsert_block_property": GraphOperationRoute(
-        "logseq.Editor.upsertBlockProperty", None, "untested"
+        "logseq.Editor.upsertBlockProperty", None, "untested",
+        notes="Set the property at block-creation time via upsert_nodes instead of updating it after the fact.",
     ),
     "remove_block_property": GraphOperationRoute(
-        "logseq.Editor.removeBlockProperty", None, "untested"
+        "logseq.Editor.removeBlockProperty", None, "untested",
+        notes="No verified cli.* route to remove a block property yet.",
     ),
     "add_block_tag": GraphOperationRoute(
-        "logseq.Editor.addBlockTag", None, "untested"
+        "logseq.Editor.addBlockTag", None, "untested",
+        notes="Tag a block at creation time via upsert_nodes's 'tags' data key (array of tag UUIDs) instead.",
     ),
     "remove_block_tag": GraphOperationRoute(
-        "logseq.Editor.removeBlockTag", None, "untested"
+        "logseq.Editor.removeBlockTag", None, "untested",
+        notes="No verified cli.* route to remove a tag from a block yet.",
     ),
     "delete_page": GraphOperationRoute(
-        "logseq.Editor.deletePage", None, "untested"
+        "logseq.Editor.deletePage", None, "untested",
+        notes="No verified cli.* route to delete a page yet; delete_page is a file-graph-only tool.",
     ),
     "rename_page": GraphOperationRoute(
-        "logseq.Editor.renamePage", None, "untested"
+        "logseq.Editor.renamePage", None, "untested",
+        notes="No verified cli.* route to rename a page yet; rename_page is a file-graph-only tool.",
     ),
     "get_pages_from_namespace": GraphOperationRoute(
         "logseq.Editor.getPagesFromNamespace", "logseq.cli.getPagesFromNamespace", "rejected",

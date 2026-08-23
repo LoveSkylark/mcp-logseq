@@ -88,6 +88,13 @@ class GetBlockPropertiesToolHandler(ToolHandler):
 
         block_uuid = args["block_uuid"]
         page_name = args.get("page_name")
+        if _tools._get_db_mode() and not page_name:
+            return [TextContent(
+                type="text",
+                text="❌ get_block_properties requires page_name in DB mode (its own "
+                "cli.getBlockProperties route hangs). Retry with page_name set to the "
+                "owning page's name or UUID.",
+            )]
         try:
             api = _tools._make_api()
             if page_name:
@@ -139,6 +146,13 @@ class GetBlockPropertyToolHandler(ToolHandler):
         block_uuid = args["block_uuid"]
         property_name = args["property_name"]
         page_name = args.get("page_name")
+        if _tools._get_db_mode() and not page_name:
+            return [TextContent(
+                type="text",
+                text="❌ get_block_property requires page_name in DB mode (its own "
+                "cli.getBlockProperty route hangs). Retry with page_name set to the "
+                "owning page's name or UUID.",
+            )]
         try:
             api = _tools._make_api()
             if page_name:

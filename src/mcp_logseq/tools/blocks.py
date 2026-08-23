@@ -168,6 +168,17 @@ class GetBlockToolHandler(ToolHandler):
         include_children = args.get("include_children", True)
         output_format = args.get("format", "text")
 
+        # Correct the request before it ever reaches Logseq: get_block has no
+        # working DB route, so DB mode needs page_name to read via
+        # get_page_data instead. Reject up front rather than let a doomed
+        # call hit get_block's hanging cli.getBlock candidate.
+        if _tools._get_db_mode() and not page_name:
+            return [TextContent(
+                type="text",
+                text="❌ get_block requires page_name in DB mode (its own cli.getBlock "
+                "route hangs). Retry with page_name set to the owning page's name or UUID.",
+            )]
+
         try:
             api = _tools._make_api()
             if _tools._get_db_mode() and page_name:
