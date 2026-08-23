@@ -253,12 +253,12 @@ therefore unavailable on DB graphs even though the tool is registered;
 | `create_page` | ✅ | |
 | `update_page` | ✅ | |
 | `list_pages` | ✅ | ✅ |
-| `get_page_content` | ✅ | |
+| `get_page_content` | ✅ | ✅ |
 | `delete_page` | ✅ | ✅ |
 | `delete_block` | ✅ | ❌ |
 | `update_block` | ✅ | ❌ |
 | `get_block` | ✅ | ⚠️ requires `page_name` |
-| `search` | ✅ | |
+| `search` | ✅ | ✅ |
 | `query` | ✅ | |
 | `find_pages_by_property` | ✅ | |
 | `get_pages_from_namespace` | ✅ | |

@@ -106,14 +106,10 @@ _FILE_ONLY_TOOL_NAMES = frozenset(
     {
         "create_page",
         "update_page",
-        "delete_page",
-        "get_page_content",
-        "search",
         "query",
         "find_pages_by_property",
         "get_pages_from_namespace",
         "get_pages_tree_from_namespace",
-        "rename_page",
         "get_page_backlinks",
     }
 )
