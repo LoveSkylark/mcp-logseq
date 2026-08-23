@@ -804,12 +804,22 @@ class PageMixin:
             logger.error(f"Error getting backlinks: {str(e)}")
             raise
 
-    def get_page_data(self, page_name: str) -> Any:
+    def get_page_data(self, page_name: str, expand_children: bool = False) -> Any:
         """
         Read a DB page entity and its direct page-level blocks.
 
         Unlike `Editor.getPageBlocksTree` (which hangs in 2.0.1), this returns,
         but it does not guarantee a recursively nested block tree.
+
+        Args:
+            page_name: Page name or UUID.
+            expand_children: When True, fan out one `get_block` call per
+                top-level block to fill in each one's nested "children" tree
+                (bundling the fan-out this caller would otherwise have to do
+                itself, one MCP round trip per block). A block whose subtree
+                is too large/slow to expand gets a "children_error" key with
+                the failure instead of aborting the whole page read -- a
+                single huge section should not hide the rest of the page.
         """
         url = self.get_base_url()
 
@@ -826,9 +836,30 @@ class PageMixin:
             )
             self._raise_for_status_verbose(response, self._method_for("get_page_data"))
             try:
-                return response.json()
+                result = response.json()
             except ValueError:
                 return response.text
+
+            if expand_children and isinstance(result, dict):
+                blocks = result.get("blocks")
+                if isinstance(blocks, list):
+                    for block in blocks:
+                        if not isinstance(block, dict):
+                            continue
+                        block_uuid = block.get("uuid") or block.get("block/uuid")
+                        if not block_uuid:
+                            continue
+                        try:
+                            expanded = self.get_block(str(block_uuid), include_children=True)
+                            if isinstance(expanded, dict):
+                                block["children"] = expanded.get("children", [])
+                        except Exception as e:
+                            logger.warning(
+                                f"Could not expand children for block '{block_uuid}': {e}"
+                            )
+                            block["children_error"] = str(e)
+
+            return result
         except requests.exceptions.RequestException as e:
             logger.error(f"Error in get_page_data: {str(e)}")
             raise

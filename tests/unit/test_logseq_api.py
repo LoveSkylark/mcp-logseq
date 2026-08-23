@@ -380,6 +380,57 @@ class TestLogSeqAPI:
         assert request_data == {"method": "logseq.cli.getPageData", "args": ["Test Page"]}
 
     @responses.activate
+    def test_get_page_data_expand_children_fills_in_nested_tree(self, logseq_client_db):
+        """expand_children bundles a get_block fan-out into one call, since
+        get_page_data alone never returns nested children for its blocks."""
+        responses.add(
+            responses.POST,
+            "http://127.0.0.1:12315/api",
+            json={
+                "entity": {"title": "Test Page"},
+                "blocks": [{"uuid": "block-1", "title": "Top block"}],
+            },
+            status=200,
+        )
+
+        with patch.object(
+            logseq_client_db, "get_block",
+            return_value={"uuid": "block-1", "children": [{"uuid": "child-1", "title": "Child"}]},
+        ) as mock_get_block:
+            result = logseq_client_db.get_page_data("Test Page", expand_children=True)
+
+        mock_get_block.assert_called_once_with("block-1", include_children=True)
+        assert result["blocks"][0]["children"] == [{"uuid": "child-1", "title": "Child"}]
+
+    @responses.activate
+    def test_get_page_data_expand_children_survives_one_block_failing(self, logseq_client_db):
+        """A single huge/failing subtree must not hide the rest of the page."""
+        responses.add(
+            responses.POST,
+            "http://127.0.0.1:12315/api",
+            json={
+                "entity": {"title": "Test Page"},
+                "blocks": [
+                    {"uuid": "block-1", "title": "Small block"},
+                    {"uuid": "block-2", "title": "Huge block"},
+                ],
+            },
+            status=200,
+        )
+
+        with patch.object(
+            logseq_client_db, "get_block",
+            side_effect=[
+                {"uuid": "block-1", "children": []},
+                TimeoutError("read timed out"),
+            ],
+        ):
+            result = logseq_client_db.get_page_data("Test Page", expand_children=True)
+
+        assert result["blocks"][0]["children"] == []
+        assert "read timed out" in result["blocks"][1]["children_error"]
+
+    @responses.activate
     def test_db_get_page_blocks_uses_page_data(self, logseq_client_db):
         """DB block lists avoid the hanging Editor.getPageBlocksTree API."""
         responses.add(

@@ -227,7 +227,21 @@ class GetPageDataToolHandler(ToolHandler):
                     "page_name": {
                         "type": "string",
                         "description": "Page name or UUID",
-                    }
+                    },
+                    "expand_children": {
+                        "type": "boolean",
+                        "description": (
+                            "When true, also fetch each top-level block's nested "
+                            "children (get_page_data alone never returns them -- "
+                            "it only lists direct page-level blocks). Bundles what "
+                            "would otherwise be one get_block call per top-level "
+                            "block into this single response. A block whose "
+                            "subtree is too large to expand gets a "
+                            "'children_error' key instead of failing the whole "
+                            "read; retry just that block with get_block if needed."
+                        ),
+                        "default": False,
+                    },
                 },
                 "required": ["page_name"],
             },
@@ -246,7 +260,9 @@ class GetPageDataToolHandler(ToolHandler):
 
         try:
             api = _tools._make_api()
-            result = api.get_page_data(args["page_name"])
+            result = api.get_page_data(
+                args["page_name"], expand_children=bool(args.get("expand_children", False))
+            )
             if isinstance(result, dict):
                 entity = result.get("entity") or result.get("page") or {}
                 if isinstance(entity, dict):
