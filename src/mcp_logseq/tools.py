@@ -2410,9 +2410,12 @@ class UpsertNodesToolHandler(ToolHandler):
                         "description": (
                             "List of operations. Each: {operation: 'add'|'edit', "
                             "entityType: 'block'|'page'|'tag'|'property', "
-                            "id: '<uuid>' (required for edit), "
-                            "data: {title: '<content>'}}. Link by UUID — "
-                            "[[<page-uuid>]] — never by page name."
+                            "id: '<uuid>' (required for edit, and its data must also include "
+                            "title), data: {title: '<content>', page-id: '<uuid>' (add block "
+                            "only), tags: ['<tag-uuid>', ...]}}. No parent/parent-id key "
+                            "exists for block hierarchy — use insert_nested_block to nest a "
+                            "block under another. Link by UUID — [[<page-uuid>]] — never by "
+                            "page name."
                         ),
                         "items": {"type": "object"},
                     },
