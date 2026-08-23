@@ -23,6 +23,7 @@ from mcp_logseq.tools import (
     GetPageBacklinksToolHandler,
     InsertNestedBlockToolHandler,
 )
+from mcp_logseq.tools.properties import GetBlockPropertyToolHandler
 
 
 class TestToolConfiguration:
@@ -1996,6 +1997,27 @@ class TestGetBlockToolHandler:
         assert "Failed to get block 'abc-123'" in result[0].text
         assert "Unexpected API failure" in result[0].text
         assert "Failed to get block" in caplog.text
+
+
+class TestGetBlockPropertyToolHandler:
+    @patch.dict("os.environ", {"LOGSEQ_API_TOKEN": "test_token", "LOGSEQ_DB_MODE": "true"})
+    @patch("mcp_logseq.tools.logseq.LogSeq")
+    def test_property_name_matches_case_insensitively(self, mock_logseq_class):
+        """Display names resolved by get_blocks_db_properties (e.g. "Alias" for
+        a built-in bare ident) shouldn't require exact-case matching."""
+        mock_api = Mock()
+        mock_api.get_block_from_page_data.return_value = {"uuid": "block-1"}
+        mock_api.get_blocks_db_properties.return_value = {"block-1": {"Alias": "hello"}}
+        mock_logseq_class.return_value = mock_api
+
+        handler = GetBlockPropertyToolHandler()
+        result = handler.run_tool({
+            "block_uuid": "block-1",
+            "property_name": "alias",
+            "page_name": "Test Page",
+        })
+
+        assert json.loads(result[0].text) == "hello"
 
 
 class TestDbUpsertValidation:

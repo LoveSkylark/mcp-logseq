@@ -162,7 +162,16 @@ class GetBlockPropertyToolHandler(ToolHandler):
                 _enforce_page_tag_access(api, page_name)
                 block = api.get_block_from_page_data(page_name, block_uuid)
                 db_properties = api.get_blocks_db_properties([block])
-                result = db_properties.get(block_uuid, {}).get(property_name)
+                props = db_properties.get(block_uuid, {})
+                result = props.get(property_name)
+                if result is None and property_name not in props:
+                    # Match resolve_property_ident's case-insensitivity: display
+                    # names like "Alias"/"Status" shouldn't require exact case.
+                    lower_name = property_name.lower()
+                    for key, val in props.items():
+                        if key.lower() == lower_name:
+                            result = val
+                            break
             else:
                 _enforce_block_namespace_access(api, block_uuid)
                 _enforce_block_tag_access(api, block_uuid)
