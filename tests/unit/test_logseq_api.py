@@ -15,7 +15,7 @@ class TestLogSeqAPI:
         assert manifest["list_pages"]["db_method"] == "logseq.cli.listPages"
         assert manifest["list_pages"]["db_status"] == "verified"
         assert manifest["get_block"]["db_method"] == "logseq.cli.getBlock"
-        assert manifest["get_block"]["db_status"] == "rejected"
+        assert manifest["get_block"]["db_status"] == "verified"
 
     def test_route_manifest_second_verification_pass(self, mock_api_key):
         """Live-tested 2026-08-23: a second round of cli.* candidates, verified
@@ -30,15 +30,15 @@ class TestLogSeqAPI:
             ("create_tag", "logseq.cli.createTag"),
             ("add_tag_property", "logseq.cli.addTagProperty"),
             ("remove_tag_property", "logseq.cli.removeTagProperty"),
+            ("get_block_property", "logseq.cli.getBlockProperty"),
+            ("update_block", "logseq.cli.updateBlock"),
         ):
             assert manifest[operation]["db_method"] == method
             assert manifest[operation]["db_status"] == "verified"
 
         for operation, method in (
-            ("get_block_property", "logseq.cli.getBlockProperty"),
             ("add_tag_extends", "logseq.cli.addTagExtends"),
             ("remove_tag_extends", "logseq.cli.removeTagExtends"),
-            ("update_block", "logseq.cli.updateBlock"),
             ("create_page", "logseq.cli.createPage"),
         ):
             assert manifest[operation]["db_method"] == method
@@ -55,11 +55,11 @@ class TestLogSeqAPI:
         than silently using the Editor.* method (no cross-namespace fallback)."""
         client = LogSeq(api_key=mock_api_key, db_mode=True)
 
-        with pytest.raises(RuntimeError, match="get_block is not available for Logseq DB graphs"):
-            client._method_for("get_block")
+        with pytest.raises(RuntimeError, match="create_page is not available for Logseq DB graphs"):
+            client._method_for("create_page")
 
-        with pytest.raises(RuntimeError, match="delete_block is not available for Logseq DB graphs"):
-            client._method_for("delete_block")
+        with pytest.raises(RuntimeError, match="remove_property is not available for Logseq DB graphs"):
+            client._method_for("remove_property")
 
     def test_init_with_defaults(self, mock_api_key):
         """Test LogSeq client initialization with default parameters."""
@@ -1003,13 +1003,22 @@ class TestGetBlock:
         assert request_body["args"] == ["abc-123", {"includeChildren": False}]
 
     @responses.activate
-    def test_get_block_unavailable_in_db_mode(self, logseq_client):
-        """get_block has no verified cli.* route, so it's unavailable on DB graphs
-        under the hard File/DB split (no cross-namespace fallback)."""
+    def test_db_mode_get_block_uses_cli_route(self, logseq_client):
+        """get_block is verified for DB graphs (2026-08-23 fresh-restart re-test)
+        and uses logseq.cli.getBlock instead of Editor.getBlock."""
         logseq_client.db_mode = True
+        responses.add(
+            responses.POST,
+            "http://127.0.0.1:12315/api",
+            json={"uuid": "abc-123", "content": "DB block", "children": []},
+            status=200,
+        )
 
-        with pytest.raises(RuntimeError, match="get_block is not available for Logseq DB graphs"):
-            logseq_client.get_block("abc-123", include_children=False)
+        result = logseq_client.get_block("abc-123", include_children=False)
+
+        assert result["uuid"] == "abc-123"
+        request_body = json.loads(responses.calls[0].request.body)
+        assert request_body["method"] == "logseq.cli.getBlock"
 
     @responses.activate
     def test_db_get_block_from_page_data_is_limited_to_page_level_blocks(self, logseq_client_db):

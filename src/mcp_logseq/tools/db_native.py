@@ -48,23 +48,42 @@ class SetBlockPropertiesToolHandler(ToolHandler):
                 text="❌ set_block_properties requires LOGSEQ_DB_MODE=true (only works with Logseq DB-mode graphs)",
             )]
 
-        if "block_uuid" not in args:
-            raise RuntimeError("block_uuid argument required")
+        if "block_uuid" not in args or "properties" not in args:
+            raise RuntimeError("block_uuid and properties arguments required")
 
-        # Access control is enforced even though the operation itself is
-        # refused below, so a restricted block never gets a different
-        # response shape than an allowed one would.
-        api = _tools._make_api()
-        _enforce_block_namespace_access(api, args["block_uuid"])
-        _enforce_block_tag_access(api, args["block_uuid"])
+        block_uuid = args["block_uuid"]
+        properties = args["properties"]
 
-        return [TextContent(
-            type="text",
-            text="❌ Graph DB does not use set_block_properties (it calls the same "
-            "logseq.Editor.upsertBlockProperty confirmed to hang indefinitely on live "
-            "Logseq 2.0.1 DB graphs). Set properties at block-creation time via "
-            "upsert_nodes instead.",
-        )]
+        try:
+            api = _tools._make_api()
+            _enforce_block_namespace_access(api, block_uuid)
+            _enforce_block_tag_access(api, block_uuid)
+            results = []
+
+            for prop_name, value in properties.items():
+                # Resolve a display name to its full ident; already-qualified
+                # idents (":ns/name") pass through unchanged.
+                ident = api.resolve_property_ident(prop_name)
+                if not ident:
+                    results.append(f"⚠️ Property '{prop_name}' not found")
+                    continue
+
+                api._upsert_block_property(block_uuid, ident, value)
+                results.append(f"✅ {prop_name} = {value}")
+
+            return [TextContent(
+                type="text",
+                text=f"Set properties on block {block_uuid}:\n" + "\n".join(results),
+            )]
+
+        except AccessDenied:
+            raise
+        except Exception as e:
+            logger.error(f"Failed to set block properties: {str(e)}")
+            return [TextContent(
+                type="text",
+                text=f"❌ Failed to set block properties: {str(e)}",
+            )]
 
 
 class UpsertNodesToolHandler(ToolHandler):

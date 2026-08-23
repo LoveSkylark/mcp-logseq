@@ -1943,17 +1943,21 @@ class TestGetBlockToolHandler:
 
     @patch.dict("os.environ", {"LOGSEQ_API_TOKEN": "test_token", "LOGSEQ_DB_MODE": "true"})
     @patch("mcp_logseq.tools.logseq.LogSeq")
-    def test_db_run_tool_without_page_name_raises(self, mock_logseq_class):
-        """DB mode without page_name is rejected up front, before any API call --
-        get_block has no working DB route at all."""
+    def test_db_run_tool_without_page_name_uses_direct_get_block(self, mock_logseq_class):
+        """get_block works directly in DB mode without page_name (verified
+        2026-08-23: the earlier hang was a wedged Editor.* write session, not
+        a real limitation of cli.getBlock)."""
         mock_api = Mock()
+        mock_api.get_block.return_value = {
+            "uuid": "abc-123", "content": "DB block content", "children": []
+        }
         mock_logseq_class.return_value = mock_api
 
         handler = GetBlockToolHandler()
         result = handler.run_tool({"block_uuid": "abc-123"})
 
-        mock_api.get_block.assert_not_called()
-        assert "requires page_name in DB mode" in result[0].text
+        mock_api.get_block.assert_called_once_with("abc-123", include_children=True)
+        assert "DB block content" in result[0].text
 
     @patch.dict("os.environ", {"LOGSEQ_API_TOKEN": "test_token"})
     def test_run_tool_missing_block_uuid(self):

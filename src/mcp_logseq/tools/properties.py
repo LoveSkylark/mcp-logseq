@@ -69,8 +69,9 @@ class GetBlockPropertiesToolHandler(ToolHandler):
                 "block_uuid": {"type": "string"},
                 "page_name": {
                     "type": "string",
-                    "description": "Owning page name or UUID. REQUIRED in DB mode: get_block_properties has "
-                    "no working DB route, so DB reads go through get_page_data + datascript instead.",
+                    "description": "Optional owning page name or UUID. Not required -- "
+                    "get_block_properties reads the block directly. If supplied, reads "
+                    "via get_page_data + datascript instead; prefer omitting this.",
                 },
             },
             "required": ["block_uuid"],
@@ -88,18 +89,11 @@ class GetBlockPropertiesToolHandler(ToolHandler):
 
         block_uuid = args["block_uuid"]
         page_name = args.get("page_name")
-        if _tools._get_db_mode() and not page_name:
-            return [TextContent(
-                type="text",
-                text="❌ get_block_properties requires page_name in DB mode (its own "
-                "cli.getBlockProperties route hangs). Retry with page_name set to the "
-                "owning page's name or UUID.",
-            )]
         try:
             api = _tools._make_api()
             if page_name:
-                # get_block_properties has no working DB route (its cli.* candidate
-                # hangs); read via get_page_data + datascript properties instead.
+                # Direct get_block_properties works in DB mode too (verified
+                # 2026-08-23); kept for callers that already pass page_name.
                 _enforce_namespace_access(page_name)
                 _enforce_page_tag_access(api, page_name)
                 block = api.get_block_from_page_data(page_name, block_uuid)
@@ -126,8 +120,9 @@ class GetBlockPropertyToolHandler(ToolHandler):
                 "block_uuid": {"type": "string"}, "property_name": {"type": "string"},
                 "page_name": {
                     "type": "string",
-                    "description": "Owning page name or UUID. REQUIRED in DB mode: get_block_property has "
-                    "no working DB route, so DB reads go through get_page_data + datascript instead.",
+                    "description": "Optional owning page name or UUID. Not required -- "
+                    "get_block_property reads the block directly. If supplied, reads "
+                    "via get_page_data + datascript instead; prefer omitting this.",
                 },
             }, "required": ["block_uuid", "property_name"],
         })
@@ -146,13 +141,6 @@ class GetBlockPropertyToolHandler(ToolHandler):
         block_uuid = args["block_uuid"]
         property_name = args["property_name"]
         page_name = args.get("page_name")
-        if _tools._get_db_mode() and not page_name:
-            return [TextContent(
-                type="text",
-                text="❌ get_block_property requires page_name in DB mode (its own "
-                "cli.getBlockProperty route hangs). Retry with page_name set to the "
-                "owning page's name or UUID.",
-            )]
         try:
             api = _tools._make_api()
             if page_name:

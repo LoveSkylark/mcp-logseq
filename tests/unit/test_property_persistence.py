@@ -6,6 +6,7 @@ through the LogSeq HTTP API, focusing on the proper handling of properties
 on the first block of a page.
 """
 
+import json
 import responses
 import pytest
 from mcp_logseq.logseq import LogSeq
@@ -133,21 +134,25 @@ class TestUpdatePageProperties:
         assert self._calls_for("upsertBlockProperty") == []
 
     @responses.activate
-    def test_db_mode_replace_raises_delete_block_unavailable(self, logseq_client_db):
-        """DB graphs: replace mode clears existing blocks via delete_block, which
-        has no verified cli.* route under the hard File/DB split (no fallback)."""
+    def test_db_mode_replace_clears_blocks_via_verified_delete_block(self, logseq_client_db):
+        """DB graphs: replace mode clears existing blocks via delete_block, now a
+        verified cli.removeBlock route (2026-08-23 fresh-restart re-test showed
+        the earlier hangs were a wedged Editor.* write path, not a real limit)."""
         url = "http://127.0.0.1:12315/api"
         responses.add(responses.POST, url, json=[{"name": "Test Page", "originalName": "Test Page"}], status=200)  # list_pages
         responses.add(responses.POST, url, json={
             "entity": {"block/title": "Test Page"},
             "blocks": [{"block/uuid": "block-1", "block/title": "Old"}],
         }, status=200)  # clear: DB-native getPageData
+        responses.add(responses.POST, url, body="null", status=200, content_type="application/json")  # cli.removeBlock
 
-        with pytest.raises(RuntimeError, match="delete_block is not available for Logseq DB graphs"):
-            logseq_client_db.update_page_with_blocks(
-                "Test Page", [{"content": "New content"}],
-                properties={"priority": "high"}, mode="replace",
-            )
+        logseq_client_db.update_page_with_blocks(
+            "Test Page", [], properties={"priority": "high"}, mode="replace",
+        )
+
+        remove_call = json.loads(responses.calls[2].request.body)
+        assert remove_call["method"] == "logseq.cli.removeBlock"
+        assert remove_call["args"] == ["block-1"]
 
     # ------------------------------------------------------------------ #
     # File graph mode                                                    #

@@ -201,7 +201,7 @@ not the same thing as the Logseq API method name.
 | List pages | `list_pages` -> `logseq.Editor.getAllPages` | `list_pages` -> `logseq.cli.listPages` |
 | Read page-level blocks | `get_page_content` -> `getPage` + `getPageBlocksTree` | `get_page_data` -> `logseq.cli.getPageData` |
 | Find content | `search` -> `logseq.App.search` | `search_blocks` -> `logseq.app.search` |
-| Read a block/tree | `get_block` -> `logseq.Editor.getBlock` | `get_block` **requires `page_name`** -> reads via `logseq.cli.getPageData` (direct children only; no verified `logseq.cli.getBlock`) |
+| Read a block/tree | `get_block` -> `logseq.Editor.getBlock` | `get_block` -> `logseq.cli.getBlock` |
 | Create or edit nodes | page/block `Editor.*` tools | `upsert_nodes` -> `logseq.cli.upsertNodes` |
 | Read tags | page properties / `Editor.*` compatibility behavior | `list_tags` -> `logseq.cli.listTags` |
 | Read properties | Markdown properties / `Editor.*` compatibility behavior | `list_properties` -> `logseq.cli.listProperties` |
@@ -221,10 +221,13 @@ unsupported one fails at call time with an "available only for..." /
 "not available for Logseq DB graphs" message.
 
 DB graphs use `logseq.cli.*` exclusively — there is **no fallback** to
-`logseq.Editor.*` when a `cli.*` route hangs or errors. Several individual
-block/property/tag mutations have no verified `cli.*` equivalent yet and are
-therefore unavailable on DB graphs even though the tool is registered;
-`upsert_nodes` is the reliable DB write path for those cases.
+`logseq.Editor.*` when a `cli.*` route hangs or errors. A handful of
+property/tag-definition mutations (`upsert_property`, `remove_property`,
+`add_tag_extends`, `remove_tag_extends`) and page creation (`create_page`)
+have no verified `cli.*` equivalent; `upsert_nodes` is the reliable DB write
+path for those cases. `Editor.*` writes can also wedge after several calls in
+one session and need a Logseq restart to recover — see the note below the
+table before concluding a route is broken from a single test.
 
 | Tool | File | DB |
 | --- | :---: | :---: |
@@ -236,16 +239,16 @@ therefore unavailable on DB graphs even though the tool is registered;
 | `get_property` | | ✅ |
 | `upsert_property` | | ❌ |
 | `remove_property` | | ❌ |
-| `get_block_properties` | | ⚠️ requires `page_name` |
-| `get_block_property` | | ⚠️ requires `page_name` |
-| `upsert_block_property` | | ❌ |
-| `remove_block_property` | | ❌ |
+| `get_block_properties` | | ✅ |
+| `get_block_property` | | ✅ |
+| `upsert_block_property` | | ✅ |
+| `remove_block_property` | | ✅ |
 | `get_tag` | | ✅ |
 | `get_tag_objects` | | ✅ |
 | `get_tags_by_name` | | ✅ |
 | `create_tag` | | ✅ |
-| `add_block_tag` | | ❌ |
-| `remove_block_tag` | | ❌ |
+| `add_block_tag` | | ✅ |
+| `remove_block_tag` | | ✅ |
 | `add_tag_property` | | ✅ |
 | `remove_tag_property` | | ✅ |
 | `add_tag_extends` | | ❌ |
@@ -255,9 +258,9 @@ therefore unavailable on DB graphs even though the tool is registered;
 | `list_pages` | ✅ | ✅ |
 | `get_page_content` | ✅ | ✅ |
 | `delete_page` | ✅ | ✅ |
-| `delete_block` | ✅ | ❌ |
-| `update_block` | ✅ | ❌ |
-| `get_block` | ✅ | ⚠️ requires `page_name` |
+| `delete_block` | ✅ | ✅ |
+| `update_block` | ✅ | ✅ |
+| `get_block` | ✅ | ✅ |
 | `search` | ✅ | ✅ |
 | `query` | ✅ | |
 | `find_pages_by_property` | ✅ | |
@@ -265,20 +268,24 @@ therefore unavailable on DB graphs even though the tool is registered;
 | `get_pages_tree_from_namespace` | ✅ | |
 | `rename_page` | ✅ | ✅ |
 | `get_page_backlinks` | ✅ | |
-| `insert_nested_block` | ✅ | ❌ |
-| `set_block_properties` | | ❌ |
+| `insert_nested_block` | ✅ | ✅ |
+| `set_block_properties` | | ✅ |
 | `vector_search` ⚗️ | ✅ | ✅ |
 | `sync_vector_db` ⚗️ | ✅ | ✅ |
 | `vector_db_status` ⚗️ | ✅ | ✅ |
 
-- **⚠️ requires `page_name`**: `get_block`/`get_block_properties`/`get_block_property`
-  have no working `cli.*` route at all; with `page_name` they read via
-  `get_page_data` instead (only sees the page's **direct** children — a
-  deeper-nested block will not be found this way).
+- **✅**: works in both graph modes, or is DB-native and works in DB mode.
 - **❌**: registered but currently unavailable on DB graphs — no verified
   `cli.*` route exists yet (`_DBToolHandler`/`_method_for` raise a clear
   "not available for Logseq DB graphs" error rather than silently using
   `Editor.*`). Use `upsert_nodes` for DB writes where possible instead.
+- **`Editor.*` writes can wedge after repeated calls in one session** and
+  need a Logseq restart to recover — a hang during testing does not always
+  mean a route is broken. `delete_block` was initially misclassified as
+  unavailable for exactly this reason: repeated failed attempts in one
+  session wedged the write path, and re-testing the same session kept
+  reproducing the wedge rather than the route's real (working) behavior. A
+  route is only genuinely rejected if it still fails on a fresh restart.
 
 ### Detailed Tool Guidance
 

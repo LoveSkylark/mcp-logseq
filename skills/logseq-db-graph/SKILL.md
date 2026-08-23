@@ -88,9 +88,9 @@ reorganization.
 3. Normalize relevant nodes in memory: retain each block's UUID, title/content,
   parent, children, tags, and typed properties. Do not infer a relationship
   from display text when a UUID is available.
-4. When inspecting one block and its owner page is known, use
-  `get_block(block_uuid, page_name, include_children=true)`. This reads stable
-  page data and extracts the matching block without the fragile direct API.
+4. When inspecting one known block, use `get_block(block_uuid,
+  include_children=true)` directly -- it works in DB mode without needing
+  the owning page.
 5. Use `list_pages`, `list_tags`, and `list_properties` to discover existing
   entities before creating any of them.
 
@@ -133,7 +133,10 @@ avoids repeated individual `Editor.*` writes.
 
 For an individual typed property/tag operation that cannot be represented by a
 batch, use the matching DB property/tag handler only after reading the current
-entity and schema.
+entity and schema. `update_block`, `insert_nested_block`, `upsert_block_property`,
+`remove_block_property`, `add_block_tag`, and `remove_block_tag` all work on DB
+graphs for exactly this case -- each is a single `Editor.*`/`cli.*` write, so
+prefer `upsert_nodes` for anything batchable and reserve these for one-off edits.
 
 ### Verified batch semantics
 
@@ -184,13 +187,10 @@ find blocks present in the page-level data.
 
 - Edit one block when one claim is wrong.
 - Create a child/sibling only when the parent and desired placement are known.
-- Remove a block only when its subtree is intentionally obsolete. `delete_block`
-  has no working route on DB graphs (both `Editor.removeBlock` and
-  `cli.removeBlock` are confirmed to hang) -- the tool errors immediately
-  rather than deleting anything. If a working route is ever found, inspect
-  the block's full subtree first (`get_block` with `page_name` and
-  `include_children=true`); deletion cascades to all descendants with no
-  `recursive` flag or child count in the response.
+- Remove a block only when its subtree is intentionally obsolete. Deletion
+  cascades to the entire subtree with no `recursive` flag or child count in
+  the response, and `get_page_data` will not show a block's children, so
+  inspect a block with `get_block` (`include_children=true`) before deleting it.
 - `delete_page` soft-deletes (recycles) an ordinary page; it is safe to use
   directly. Tags, properties, and today's journal delete permanently instead
   -- that is Logseq's own recycle-bin behavior.
@@ -199,8 +199,10 @@ find blocks present in the page-level data.
   replace the obsolete material in the same planned change.
 
 Avoid repeated individual `Editor.*` writes: Logseq 2.0.1 can wedge after a
-small run of them. A timed-out write may have committed, so read back before
-retrying.
+small run of them, and a wedged write can make an otherwise-working route
+(e.g. `delete_block`) look permanently broken when it is really just stuck
+until a Logseq restart. A timed-out write may have committed, so read back
+before retrying.
 
 ## Text formatting rules
 
@@ -218,7 +220,7 @@ retrying.
 |---|---|
 | Find content | `search_blocks` |
 | Read a page/tree | `get_page_data` |
-| Read a known block | `get_block` with `page_name` |
+| Read a known block | `get_block` |
 | Discover pages | `list_pages` |
 | Discover classes/tags | `list_tags` |
 | Discover typed schemas | `list_properties` |
@@ -228,9 +230,11 @@ retrying.
 ## Failure handling
 
 - A first-time timeout usually indicates an unsafe argument shape. Stop and
-  compare arguments to the verified workflow before retrying.
+  compare arguments to the verified workflow before retrying, and consider
+  whether prior failed writes in the same session have wedged the `Editor.*`
+  path (a restart clears it) rather than assuming the route is broken.
 - `get_block(include_children=false)` is a known Logseq 2.0.1 hang. Always use
-  `true`; prefer providing `page_name` when it is available.
+  `true`.
 - `Editor.getPageBlocksTree` is a known DB-mode hang. Use `get_page_data`.
 - If a previously successful `Editor.*` call begins timing out while search
   still works, Logseq is wedged. Stop issuing Editor calls, verify state with

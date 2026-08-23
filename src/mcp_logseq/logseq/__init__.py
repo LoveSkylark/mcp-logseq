@@ -71,16 +71,20 @@ GRAPH_OPERATION_ROUTES: dict[str, GraphOperationRoute] = {
     # out a global wedge masking a per-method issue). No Editor.* fallback —
     # these operations are simply unavailable on DB graphs.
     "get_block": GraphOperationRoute(
-        "logseq.Editor.getBlock", "logseq.cli.getBlock", "rejected",
-        notes="logseq.cli.getBlock hangs (HTTP 0) for both includeChildren=true and false.",
+        "logseq.Editor.getBlock", "logseq.cli.getBlock", "verified",
+        notes="Live-tested 2026-08-23: hung repeatedly in a session with prior "
+        "failed Editor.* write attempts, but succeeded instantly on a fresh "
+        "Logseq restart -- see the wedge-recovery note in delete_block.",
     ),
     "get_block_properties": GraphOperationRoute(
-        "logseq.Editor.getBlockProperties", "logseq.cli.getBlockProperties", "rejected",
-        notes="logseq.cli.getBlockProperties hangs (HTTP 0) even with a bare block UUID argument.",
+        "logseq.Editor.getBlockProperties", "logseq.cli.getBlockProperties", "verified",
+        notes="Live-tested 2026-08-23: hung repeatedly alongside get_block, but "
+        "succeeded instantly on a fresh Logseq restart.",
     ),
     "get_block_property": GraphOperationRoute(
-        "logseq.Editor.getBlockProperty", "logseq.cli.getBlockProperty", "rejected",
-        notes="logseq.cli.getBlockProperty hangs (HTTP 0).",
+        "logseq.Editor.getBlockProperty", "logseq.cli.getBlockProperty", "verified",
+        notes="Live-tested 2026-08-23: hung repeatedly alongside get_block, but "
+        "succeeded instantly on a fresh Logseq restart.",
     ),
     "add_tag_extends": GraphOperationRoute(
         "logseq.Editor.addTagExtends", "logseq.cli.addTagExtends", "rejected",
@@ -91,8 +95,10 @@ GRAPH_OPERATION_ROUTES: dict[str, GraphOperationRoute] = {
         notes="logseq.cli.removeTagExtends hangs (HTTP 0).",
     ),
     "update_block": GraphOperationRoute(
-        "logseq.Editor.updateBlock", "logseq.cli.updateBlock", "rejected",
-        notes="logseq.cli.updateBlock hangs (HTTP 0).",
+        "logseq.Editor.updateBlock", "logseq.cli.updateBlock", "verified",
+        notes="Live-tested 2026-08-23: hung in an earlier, already-wedged Editor.* "
+        "write session, but succeeded instantly (and actually changed the block's "
+        "content) on a fresh Logseq restart.",
     ),
     "create_page": GraphOperationRoute(
         "logseq.Editor.createPage", "logseq.cli.createPage", "rejected",
@@ -111,14 +117,19 @@ GRAPH_OPERATION_ROUTES: dict[str, GraphOperationRoute] = {
     # bracketed with a cli.listPages responsiveness check immediately after
     # every hang, ruling out a global wedge masking a per-method issue.
     "delete_block": GraphOperationRoute(
-        "logseq.Editor.removeBlock", None, "rejected",
-        notes="logseq.cli.removeBlock hangs (HTTP 0). No batch 'remove' op in "
-        "upsertNodes either; there is no working DB deletion route yet.",
+        "logseq.Editor.removeBlock", "logseq.cli.removeBlock", "verified",
+        notes="Live-tested 2026-08-23: both Editor.removeBlock and cli.removeBlock "
+        "hung repeatedly in a session that had already made several failed "
+        "Editor.* write attempts, but both succeeded instantly on a fresh "
+        "Logseq restart. The earlier 'rejected' classification was a false "
+        "negative from testing an already-wedged Editor.* write path, not a "
+        "real limitation of this route -- see the wedge-recovery note below.",
     ),
     "insert_block": GraphOperationRoute(
-        "logseq.Editor.insertBlock", None, "rejected",
-        notes="logseq.cli.insertBlock hangs (HTTP 0). Use upsert_nodes to add a "
-        "block (entityType='block', data={'title','page-id','tags'}) instead.",
+        "logseq.Editor.insertBlock", "logseq.cli.insertBlock", "verified",
+        notes="Live-tested 2026-08-23: hung in an earlier, already-wedged Editor.* "
+        "write session, but succeeded instantly on a fresh Logseq restart, "
+        "returning the newly-created child block entity.",
     ),
     "remove_property": GraphOperationRoute(
         "logseq.Editor.removeProperty", None, "rejected",
@@ -128,24 +139,28 @@ GRAPH_OPERATION_ROUTES: dict[str, GraphOperationRoute] = {
         "property definition.",
     ),
     "upsert_block_property": GraphOperationRoute(
-        "logseq.Editor.upsertBlockProperty", None, "rejected",
-        notes="logseq.cli.upsertBlockProperty hangs (HTTP 0). Set the property "
-        "at block-creation time via upsert_nodes instead of updating it after the fact.",
+        "logseq.Editor.upsertBlockProperty", "logseq.cli.upsertBlockProperty", "verified",
+        notes="Live-tested 2026-08-23: hung in an earlier, already-wedged Editor.* "
+        "write session, but succeeded instantly on a fresh Logseq restart, "
+        "confirmed by reading the property back afterward.",
     ),
     "remove_block_property": GraphOperationRoute(
-        "logseq.Editor.removeBlockProperty", None, "rejected",
-        notes="logseq.cli.removeBlockProperty hangs (HTTP 0). No working DB "
-        "route to remove a block property yet.",
+        "logseq.Editor.removeBlockProperty", "logseq.cli.removeBlockProperty", "verified",
+        notes="Live-tested 2026-08-23: hung in an earlier, already-wedged Editor.* "
+        "write session, but succeeded instantly on a fresh Logseq restart, "
+        "confirmed by reading the property back afterward.",
     ),
     "add_block_tag": GraphOperationRoute(
-        "logseq.Editor.addBlockTag", None, "rejected",
-        notes="logseq.cli.addBlockTag hangs (HTTP 0). Tag a block at creation "
-        "time via upsert_nodes's 'tags' data key (array of tag UUIDs) instead.",
+        "logseq.Editor.addBlockTag", "logseq.cli.addBlockTag", "verified",
+        notes="Live-tested 2026-08-23: hung in an earlier, already-wedged Editor.* "
+        "write session, but succeeded instantly on a fresh Logseq restart, "
+        "confirmed by reading the block's tags back afterward.",
     ),
     "remove_block_tag": GraphOperationRoute(
-        "logseq.Editor.removeBlockTag", None, "rejected",
-        notes="logseq.cli.removeBlockTag hangs (HTTP 0). No working DB route "
-        "to remove a tag from a block yet.",
+        "logseq.Editor.removeBlockTag", "logseq.cli.removeBlockTag", "verified",
+        notes="Live-tested 2026-08-23: hung in an earlier, already-wedged Editor.* "
+        "write session, but succeeded instantly on a fresh Logseq restart, "
+        "confirmed by reading the block's tags back afterward.",
     ),
     "delete_page": GraphOperationRoute(
         "logseq.Editor.deletePage", "logseq.cli.deletePage", "verified",
