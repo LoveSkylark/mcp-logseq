@@ -221,6 +221,7 @@ class TestListPagesToolHandler:
         assert tool.description is not None
         assert "Lists all pages in a LogSeq graph" in tool.description
         assert tool.input_schema["required"] == []
+        assert "expand" in tool.input_schema["properties"]
 
     @patch.dict("os.environ", {"LOGSEQ_API_TOKEN": "test_token"})
     @patch("mcp_logseq.tools.logseq.LogSeq")
@@ -248,6 +249,18 @@ class TestListPagesToolHandler:
         assert "Journal Page" not in text
         assert "Total pages: 2" in text
         assert "(excluding journal pages)" in text
+        mock_api.list_pages.assert_called_once_with(expand=False)
+
+    @patch.dict("os.environ", {"LOGSEQ_API_TOKEN": "test_token"})
+    @patch("mcp_logseq.tools.logseq.LogSeq")
+    def test_run_tool_forwards_expand(self, mock_logseq_class):
+        mock_api = Mock()
+        mock_api.list_pages.return_value = []
+        mock_logseq_class.return_value = mock_api
+
+        ListPagesToolHandler().run_tool({"expand": True})
+
+        mock_api.list_pages.assert_called_once_with(expand=True)
 
     @patch.dict("os.environ", {"LOGSEQ_API_TOKEN": "test_token"})
     @patch("mcp_logseq.tools.logseq.LogSeq")
@@ -1925,6 +1938,21 @@ class TestGetBlockToolHandler:
         mock_api.get_block.assert_not_called()
         assert "Block content" in result[0].text
 
+    @patch.dict("os.environ", {"LOGSEQ_API_TOKEN": "test_token", "LOGSEQ_DB_MODE": "true"})
+    @patch("mcp_logseq.tools.logseq.LogSeq")
+    def test_db_page_data_block_with_bare_title_is_rendered(self, mock_logseq_class):
+        mock_api = Mock()
+        mock_api.get_block_from_page_data.return_value = {
+            "block/uuid": "abc-123", "title": "Bare DB block title", "children": []
+        }
+        mock_api.get_blocks_db_properties.return_value = {}
+        mock_logseq_class.return_value = mock_api
+
+        handler = GetBlockToolHandler()
+        result = handler.run_tool({"block_uuid": "abc-123", "page_name": "Test Page"})
+
+        assert "Bare DB block title" in result[0].text
+
     @patch.dict("os.environ", {"LOGSEQ_API_TOKEN": "test_token"})
     def test_run_tool_missing_block_uuid(self):
         """Test that omitting block_uuid raises RuntimeError."""
@@ -1994,6 +2022,46 @@ class TestDbUpsertValidation:
         })
 
         assert "requires page-id" in result[0].text
+
+    @patch("mcp_logseq.tools._get_db_mode", return_value=True)
+    def test_rejects_unknown_data_key(self, _db_mode):
+        from mcp_logseq.tools import UpsertNodesToolHandler
+
+        result = UpsertNodesToolHandler().run_tool({
+            "operations": [{
+                "operation": "add",
+                "entityType": "block",
+                "data": {
+                    "title": "test",
+                    "page-id": "temporary-page",
+                    "parent-id": "not-supported",
+                },
+            }]
+        })
+
+        assert "unsupported data key" in result[0].text
+        assert "parent-id" in result[0].text
+
+    @patch.dict("os.environ", {"LOGSEQ_UPSERT_STRICT": "false"})
+    @patch("mcp_logseq.tools._get_db_mode", return_value=True)
+    @patch("mcp_logseq.tools.logseq.LogSeq")
+    def test_can_disable_strict_data_key_validation(self, mock_logseq_class, _db_mode):
+        from mcp_logseq.tools import UpsertNodesToolHandler
+
+        mock_logseq_class.return_value.upsert_nodes.side_effect = ["Dry run", "Added"]
+        result = UpsertNodesToolHandler().run_tool({
+            "operations": [{
+                "operation": "add",
+                "entityType": "block",
+                "data": {
+                    "title": "test",
+                    "page-id": "temporary-page",
+                    "future-key": "allowed-through",
+                },
+            }]
+        })
+
+        assert "VALIDATED AND COMMITTED" in result[0].text
 
     @patch.dict("os.environ", {"LOGSEQ_API_TOKEN": "test_token"})
     @patch("mcp_logseq.tools._get_db_mode", return_value=True)

@@ -30,6 +30,8 @@ skill in the same Claude conversation.
 - Properties are typed; do not write Markdown `key:: value` lines.
 - Tags are first-class class/tag nodes.
 - Use UUID references, not page-name links, when creating DB node relationships.
+- DB endpoints may return namespaced fields (`block/title`, `block/uuid`) or
+  bare fields (`title`, `uuid`). Treat both as valid representations.
 
 Never use these file-graph conventions in a DB graph:
 
@@ -81,7 +83,8 @@ reorganization.
 
 1. Use `search_blocks` to find distinctive content and collect page/block UUIDs.
   Read `content` rather than highlighted search titles.
-2. Use `get_page_data` to obtain the page entity and its full block tree.
+2. Use `get_page_data` to obtain the page entity and its direct page-level
+  blocks. Do not assume every nested descendant is present.
 3. Normalize relevant nodes in memory: retain each block's UUID, title/content,
   parent, children, tags, and typed properties. Do not infer a relationship
   from display text when a UUID is available.
@@ -106,6 +109,10 @@ DB properties and tags are not text decoration.
 4. Put only exact UUIDs or verified temporary IDs in the mutation plan.
 5. For built-in Logseq concepts, prefer the supported DB API/schema. Do not
   claim that inserting text such as `alias::` or `tags::` changed a DB property.
+
+Use full property idents when writing typed properties, for example
+`:logseq.property/status`. Display names can be resolved, but full idents avoid
+plugin-namespaced duplicates and are the canonical DB representation.
 
 ## Deploy mutations
 
@@ -139,6 +146,10 @@ entity and schema.
   temporary IDs to connect dependent additions inside the same batch.
 - This is the preferred path for bulk imports and related edits. It avoids the
   repeated `Editor.*` write pattern that can wedge Logseq.
+- `upsert_nodes` is flat-only in Logseq 2.0.1. Do not send `parent-id`,
+  `parent`, `block/parent`, `properties`, `order`, or other undocumented keys.
+  Strict validation rejects these by default; `LOGSEQ_UPSERT_STRICT=false` is a
+  temporary compatibility escape hatch for a future Logseq release.
 
 Do not generalize this reliability claim to every `logseq.cli.*` alias. Prefer
 the native DB methods this service verifies and exposes, then verify every
@@ -163,6 +174,11 @@ When using DB queries or interpreting DB page data, use DB schema names:
 
 Similarly, use DB DSL forms such as `(property key)` and `(tags tag)` rather
 than file-graph forms such as `(page-property key)` and `(page-tags tag)`.
+
+`get_page_data` returns the page entity and its direct page-level blocks. Do
+not assume it contains every nested descendant. For a known nested block, use
+`get_block` with `include_children=true`; a `page_name` optimization can only
+find blocks present in the page-level data.
 
 ## Minimal-diff rules
 

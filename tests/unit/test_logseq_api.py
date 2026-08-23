@@ -20,6 +20,18 @@ class TestLogSeqAPI:
         assert client.verify_ssl == True
         assert client.timeout == (3, 6)
 
+    @responses.activate
+    def test_upsert_nodes_includes_logseq_error_body(self, logseq_client_db):
+        responses.add(
+            responses.POST,
+            "http://127.0.0.1:12315/api",
+            body="unknown operation key: parent-id",
+            status=500,
+        )
+
+        with pytest.raises(RuntimeError, match="unknown operation key: parent-id"):
+            logseq_client_db.upsert_nodes([], dry_run=True)
+
     def test_init_with_custom_timeout(self, mock_api_key):
         """Test LogSeq client initialization with custom request timeout."""
         client = LogSeq(api_key=mock_api_key, timeout=(5, 60))
@@ -224,6 +236,24 @@ class TestLogSeqAPI:
             "method": "logseq.cli.listPages",
             "args": [{"expand": True}],
         }
+
+    @responses.activate
+    def test_db_list_pages_normalizes_bare_titles(self, logseq_client_db):
+        responses.add(
+            responses.POST,
+            "http://127.0.0.1:12315/api",
+            json=[{"title": "Bare DB Title", "uuid": "page-uuid"}],
+            status=200,
+        )
+
+        result = logseq_client_db.list_pages()
+
+        assert result == [{
+            "title": "Bare DB Title",
+            "uuid": "page-uuid",
+            "name": "Bare DB Title",
+            "originalName": "Bare DB Title",
+        }]
 
     @responses.activate
     def test_get_page_content_success(self, logseq_client, mock_logseq_responses):
@@ -886,8 +916,8 @@ class TestGetBlock:
         assert request_body["args"] == ["abc-123", {"includeChildren": True}]
 
     @responses.activate
-    def test_db_get_block_from_page_data(self, logseq_client_db):
-        """Known-page DB reads bypass Editor.getBlock."""
+    def test_db_get_block_from_page_data_is_limited_to_page_level_blocks(self, logseq_client_db):
+        """CLI page data does not expose nested descendants as a reliable tree."""
         responses.add(
             responses.POST,
             "http://127.0.0.1:12315/api",
@@ -900,9 +930,9 @@ class TestGetBlock:
             status=200,
         )
 
-        assert logseq_client_db.get_block_from_page_data("Test Page", "abc-123") == {
-            "block/uuid": "abc-123"
-        }
+        with pytest.raises(ValueError, match="not found on page"):
+            logseq_client_db.get_block_from_page_data("Test Page", "abc-123")
+
         request_body = json.loads(responses.calls[0].request.body)
         assert request_body == {"method": "logseq.cli.getPageData", "args": ["Test Page"]}
 

@@ -25,6 +25,10 @@
   .\test-logseq-db-api.ps1 -Suite EditorGetBlockFalse -Token "test-token"
 
 .EXAMPLE
+    # Test whether the DB CLI exposes an Editor-equivalent block read.
+    .\test-logseq-db-api.ps1 -Suite CliGetBlockTrue -Token "test-token"
+
+.EXAMPLE
   # Execute one custom direct call after Core. Arguments must be a JSON array.
   .\test-logseq-db-api.ps1 -Suite Direct -Token "test-token" `
     -Method "logseq.Editor.getBlockProperties" `
@@ -40,6 +44,9 @@ param(
         "Core",
         "EditorGetBlockTrue",
         "EditorGetBlockFalse",
+        "CliGetBlockTrue",
+        "CliGetBlockFalse",
+        "CliGetBlockProperties",
         "EditorUpsertBlockProperty",
         "EditorGetBlockProperties",
         "EditorRemoveBlockProperty",
@@ -276,6 +283,18 @@ function Invoke-EditorScenario {
         "EditorGetBlockFalse" {
             $response = Invoke-LogseqApi -Method "logseq.Editor.getBlock" -Arguments @($blockUuid, @{ includeChildren = $false })
             Add-Result -Results $results -Name "Editor.getBlock includeChildren=false" -Response $response -ExpectedSuccess $false -Notes "Known Logseq 2.0.1 hang candidate"
+        }
+        "CliGetBlockTrue" {
+            $response = Invoke-LogseqApi -Method "logseq.cli.getBlock" -Arguments @($blockUuid, @{ includeChildren = $true })
+            Add-Result -Results $results -Name "CLI.getBlock includeChildren=true" -Response $response -Notes "Candidate DB mapping; compare result shape with Editor.getBlock"
+        }
+        "CliGetBlockFalse" {
+            $response = Invoke-LogseqApi -Method "logseq.cli.getBlock" -Arguments @($blockUuid, @{ includeChildren = $false })
+            Add-Result -Results $results -Name "CLI.getBlock includeChildren=false" -Response $response -ExpectedSuccess $false -Notes "Candidate mapping with known unsafe argument shape"
+        }
+        "CliGetBlockProperties" {
+            $response = Invoke-LogseqApi -Method "logseq.cli.getBlockProperties" -Arguments @($blockUuid)
+            Add-Result -Results $results -Name "CLI.getBlockProperties" -Response $response -Notes "Candidate DB mapping; use one scenario per Logseq session"
         }
         "EditorUpsertBlockProperty" {
             $response = Invoke-LogseqApi -Method "logseq.Editor.upsertBlockProperty" -Arguments @($blockUuid, "mcp-direct-mutation-test", "run-$($State.RunId)")

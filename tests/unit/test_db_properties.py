@@ -2,6 +2,7 @@
 
 import json
 import pytest
+import requests
 import responses
 from unittest.mock import patch, Mock
 
@@ -249,15 +250,21 @@ class TestResolvePropertyIdent:
         assert result is None
 
     @responses.activate
-    def test_query_failure(self, logseq_client):
-        """API failure returns None."""
+    def test_query_failure_propagates(self, logseq_client):
+        """Transport failures are not misreported as a missing property."""
         responses.add(
             responses.POST, "http://127.0.0.1:12315/api",
             status=500,
         )
 
-        result = logseq_client.resolve_property_ident("Status")
-        assert result is None
+        with pytest.raises(requests.exceptions.HTTPError):
+            logseq_client.resolve_property_ident("Status")
+
+    def test_full_ident_is_returned_without_query(self, logseq_client):
+        assert (
+            logseq_client.resolve_property_ident(":logseq.property/status")
+            == ":logseq.property/status"
+        )
 
 
 class TestFormatBlockTreeDbMode:

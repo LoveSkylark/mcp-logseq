@@ -189,7 +189,7 @@ def _normalize_db_block(block: dict) -> dict:
     """Add the legacy aliases used by the text formatter to DB API blocks."""
     normalized = dict(block)
     normalized["content"] = str(
-        block.get("block/title") or block.get("content") or ""
+        block.get("block/title") or block.get("title") or block.get("content") or ""
     )
     if "uuid" not in normalized and "block/uuid" in block:
         normalized["uuid"] = str(block["block/uuid"])
@@ -220,6 +220,19 @@ def _validate_upsert_operations(operations: list[dict]) -> None:
     """Validate the public subset of Logseq 2.x upsertNodes operations."""
     allowed_operations = {"add", "edit"}
     allowed_entities = {"block", "page", "tag", "property"}
+    allowed_data_keys = {
+        ("add", "block"): {"title", "page-id", "tags"},
+        ("add", "page"): {"title", "tags"},
+        ("add", "tag"): {"title"},
+        ("add", "property"): {"title"},
+        ("edit", "block"): {"title"},
+        ("edit", "page"): {"title"},
+        ("edit", "tag"): {"title"},
+        ("edit", "property"): {"title"},
+    }
+    strict = os.getenv("LOGSEQ_UPSERT_STRICT", "true").lower() not in {
+        "0", "false", "no"
+    }
     for index, operation in enumerate(operations):
         if not isinstance(operation, dict):
             raise ValueError(f"operation {index} must be an object")
@@ -232,6 +245,13 @@ def _validate_upsert_operations(operations: list[dict]) -> None:
             raise ValueError(f"operation {index} has invalid entityType")
         if not isinstance(data, dict):
             raise ValueError(f"operation {index} data must be an object")
+        allowed = allowed_data_keys[(operation_type, entity_type)]
+        unknown = set(data) - allowed
+        if strict and unknown:
+            raise ValueError(
+                f"operation {index} has unsupported data key(s) {sorted(unknown)} for "
+                f"{operation_type} {entity_type}. Allowed keys: {sorted(allowed)}."
+            )
         if operation_type == "edit":
             operation_id = operation.get("id")
             if not isinstance(operation_id, str):
@@ -445,6 +465,11 @@ class ListPagesToolHandler(ToolHandler):
                         "type": "boolean",
                         "description": "Whether to include journal/daily notes in the list",
                         "default": False,
+                    },
+                    "expand": {
+                        "type": "boolean",
+                        "description": "Include expanded DB page metadata. DB graphs only; ignored for file graphs.",
+                        "default": False,
                     }
                 },
                 "required": [],
@@ -453,10 +478,11 @@ class ListPagesToolHandler(ToolHandler):
 
     def run_tool(self, args: dict) -> list[TextContent]:
         include_journals = args.get("include_journals", False)
+        expand = args.get("expand", False)
 
         try:
             api = _make_api()
-            result = api.list_pages()
+            result = api.list_pages(expand=expand)
 
             # Format pages for display
             pages_info = []
@@ -1066,7 +1092,9 @@ class GetBlockToolHandler(ToolHandler):
             if _get_db_mode() and page_name:
                 _enforce_namespace_access(page_name)
                 _enforce_page_tag_access(api, page_name)
-                result = api.get_block_from_page_data(page_name, block_uuid)
+                result = _normalize_db_block(
+                    api.get_block_from_page_data(page_name, block_uuid)
+                )
             else:
                 _enforce_block_namespace_access(api, block_uuid)
                 _enforce_block_tag_access(api, block_uuid)
@@ -2223,7 +2251,7 @@ class InsertNestedBlockToolHandler(ToolHandler):
                     },
                     "properties": {
                         "type": "object",
-                        "description": "Optional block properties (e.g., {'marker': 'TODO', 'priority': 'A'})",
+                        "description": "Optional file-graph block properties. In DB mode, do not pass bare names such as marker or priority; use upsert_nodes for supported DB data.",
                         "additionalProperties": True
                     },
                     "sibling": {
@@ -2299,7 +2327,7 @@ class SetBlockPropertiesToolHandler(ToolHandler):
     def get_tool_description(self):
         return Tool(
             name=self.name,
-            description="Set properties on a block in Logseq DB-mode. Properties must be defined on the block's tag/class. Use property display names (e.g. 'Content status', not the internal ident).",
+            description="Set properties on a block in Logseq DB mode. Prefer full property idents such as ':logseq.property/status'; display names are resolved case-insensitively when unambiguous.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -2309,7 +2337,7 @@ class SetBlockPropertiesToolHandler(ToolHandler):
                     },
                     "properties": {
                         "type": "object",
-                        "description": "Properties to set as {name: value} pairs. Use display names (e.g. 'Content status': 'kiem')",
+                        "description": "Properties to set as {ident-or-name: value} pairs. Prefer full idents (e.g. ':logseq.property/status': 'Doing').",
                         "additionalProperties": True,
                     },
                 },

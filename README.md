@@ -184,7 +184,7 @@ operational source of truth for safe tool selection and batching.
 | Properties | `key:: value` lines | Typed property entities and `logseq.property/*` fields |
 | Tags | Text tags in Markdown properties | First-class tag/class nodes |
 | Main write pattern | Individual `logseq.Editor.*` operations | `logseq.cli.upsertNodes` batch operations |
-| Page read pattern | `getPage` plus `getPageBlocksTree` | `logseq.cli.getPageData` |
+| Page read pattern | `getPage` plus `getPageBlocksTree` | `logseq.cli.getPageData` for page-level blocks |
 | Search pattern | `logseq.App.search` | `logseq.app.search` |
 
 ### Same Capability, Different API Namespace
@@ -197,9 +197,9 @@ the same thing as the Logseq API method name.
 | Capability | File graph tool and API | DB graph tool and API |
 | --- | --- | --- |
 | List pages | `list_pages` -> `logseq.Editor.getAllPages` | `list_pages` -> `logseq.cli.listPages` |
-| Read a page tree | `get_page_content` -> `getPage` + `getPageBlocksTree` | `get_page_data` -> `logseq.cli.getPageData` |
+| Read page-level blocks | `get_page_content` -> `getPage` + `getPageBlocksTree` | `get_page_data` -> `logseq.cli.getPageData` |
 | Find content | `search` -> `logseq.App.search` | `search_blocks` -> `logseq.app.search` |
-| Read a block/tree | `get_block` -> `logseq.Editor.getBlock` | `get_page_data` for a page tree; no verified `logseq.cli.getBlock` endpoint |
+| Read a block/tree | `get_block` -> `logseq.Editor.getBlock` | `get_block` with `include_children=true`; no verified `logseq.cli.getBlock` endpoint |
 | Create or edit nodes | page/block `Editor.*` tools | `upsert_nodes` -> `logseq.cli.upsertNodes` |
 | Read tags | page properties / `Editor.*` compatibility behavior | `list_tags` -> `logseq.cli.listTags` |
 | Read properties | Markdown properties / `Editor.*` compatibility behavior | `list_properties` -> `logseq.cli.listProperties` |

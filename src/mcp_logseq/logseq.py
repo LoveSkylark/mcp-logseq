@@ -49,8 +49,19 @@ class LogSeq:
             verify=self.verify_ssl,
             timeout=self.timeout,
         )
-        response.raise_for_status()
+        self._raise_for_status_verbose(response, method)
         return response.json()
+
+    @staticmethod
+    def _raise_for_status_verbose(response: requests.Response, context: str) -> None:
+        """Raise an HTTP error that retains Logseq's diagnostic response body."""
+        try:
+            response.raise_for_status()
+        except requests.exceptions.HTTPError as error:
+            body = (response.text or "").strip()[:2000]
+            raise RuntimeError(
+                f"{context} failed ({response.status_code}): {body or '<empty response body>'}"
+            ) from error
 
     def check_current_is_db_graph(self) -> bool:
         """Ask Logseq whether the active graph uses the DB graph format."""
@@ -132,7 +143,7 @@ class LogSeq:
                 verify=self.verify_ssl,
                 timeout=self.timeout,
             )
-            response.raise_for_status()
+            self._raise_for_status_verbose(response, method)
             result = response.json()
             if self.db_mode and isinstance(result, list):
                 normalized = []
@@ -140,7 +151,12 @@ class LogSeq:
                     if not isinstance(page, dict):
                         continue
                     page = dict(page)
-                    title = page.get("block/title") or page.get("block/name")
+                    title = (
+                        page.get("block/title")
+                        or page.get("block/name")
+                        or page.get("title")
+                        or page.get("name")
+                    )
                     if title:
                         page.setdefault("name", title)
                         page.setdefault("originalName", title)
@@ -165,7 +181,7 @@ class LogSeq:
                 verify=self.verify_ssl,
                 timeout=self.timeout,
             )
-            response.raise_for_status()
+            self._raise_for_status_verbose(response, "logseq.cli.listTags")
             return response.json()
         except Exception as e:
             logger.error(f"Error listing tags: {str(e)}")
@@ -184,7 +200,7 @@ class LogSeq:
                 verify=self.verify_ssl,
                 timeout=self.timeout,
             )
-            response.raise_for_status()
+            self._raise_for_status_verbose(response, "logseq.cli.listProperties")
             return response.json()
         except Exception as e:
             logger.error(f"Error listing properties: {str(e)}")
@@ -1213,7 +1229,7 @@ class LogSeq:
         return result
 
     def resolve_property_ident(self, property_name: str) -> str | None:
-        """Look up the :user.property/* ident for a property by its display name.
+        """Look up a DB property ident for a display name or return a full ident.
 
         Uses a two-step approach since DB-mode datascript queries cannot filter
         on string attributes directly.
@@ -1222,20 +1238,24 @@ class LogSeq:
             property_name: The human-readable property name (e.g. "Content status")
 
         Returns:
-            The ident string (e.g. ":user.property/Contentstatus-oa99RD2-") or None
+            The ident string (e.g. ":logseq.property/status") or None
         """
+        if property_name.startswith(":"):
+            return property_name
+
+        property_ident_prefixes = (
+            ":user.property/",
+            ":logseq.property/",
+            ":plugin.property.",
+        )
         # Get all user property entities
         query = '[:find ?id ?ident :where [?id :db/ident ?ident]]'
-        try:
-            result = self.datascript_query(query)
-            # Filter for :user.property/* idents
-            for entity_id, ident in result:
-                if isinstance(ident, str) and ident.startswith(":user.property/"):
-                    title = self._resolve_entity_title(entity_id)
-                    if title and title.lower() == property_name.lower():
-                        return ident
-        except Exception:
-            pass
+        result = self.datascript_query(query)
+        for entity_id, ident in result:
+            if isinstance(ident, str) and ident.startswith(property_ident_prefixes):
+                title = self._resolve_entity_title(entity_id)
+                if title and title.lower() == property_name.lower():
+                    return ident
         return None
 
     def get_block(self, block_uuid: str, include_children: bool = True) -> Any:
@@ -1284,7 +1304,7 @@ class LogSeq:
             raise
 
     def get_block_from_page_data(self, page_name: str, block_uuid: str) -> Any:
-        """Read a DB page and return one block from its tree by UUID."""
+        """Read a DB page and return a top-level block by UUID."""
         page_data = self.get_page_data(page_name)
         if not isinstance(page_data, dict) or page_data.get("error"):
             raise ValueError(f"Page '{page_name}' not found")
@@ -1296,9 +1316,6 @@ class LogSeq:
                 candidate_uuid = str(block.get("uuid") or block.get("block/uuid") or "")
                 if candidate_uuid == block_uuid:
                     return block
-                child = find_block(block.get("children") or block.get("block/children") or [])
-                if child:
-                    return child
             return None
 
         block = find_block(page_data.get("blocks") or [])
@@ -1640,7 +1657,7 @@ class LogSeq:
                 verify=self.verify_ssl,
                 timeout=self.timeout,
             )
-            response.raise_for_status()
+            self._raise_for_status_verbose(response, "logseq.cli.upsertNodes")
             try:
                 return response.json()
             except ValueError:
@@ -1651,10 +1668,10 @@ class LogSeq:
 
     def get_page_data(self, page_name: str) -> Any:
         """
-        Read a whole page via `logseq.cli.getPageData`.
+        Read a DB page entity and its direct page-level blocks.
 
-        The CLI equivalent of get_page_blocks_tree. Unlike
-        `Editor.getPageBlocksTree` (which hangs in 2.0.1), this returns.
+        Unlike `Editor.getPageBlocksTree` (which hangs in 2.0.1), this returns,
+        but it does not guarantee a recursively nested block tree.
         """
         url = self.get_base_url()
 
@@ -1669,7 +1686,7 @@ class LogSeq:
                 verify=self.verify_ssl,
                 timeout=self.timeout,
             )
-            response.raise_for_status()
+            self._raise_for_status_verbose(response, "logseq.cli.getPageData")
             try:
                 return response.json()
             except ValueError:
