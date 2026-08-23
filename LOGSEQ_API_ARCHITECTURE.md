@@ -84,6 +84,38 @@ operation at a time.
 - `logseq.cli.getBlockProperties` hangs the same way even with a bare block
   UUID argument and no options object. `get_block_properties` stays routed to
   `logseq.Editor.getBlockProperties`.
+- `logseq.cli.getBlockProperty` hangs the same way. `get_block_property` stays
+  routed to `logseq.Editor.getBlockProperty`.
+- `logseq.cli.addTagExtends`/`logseq.cli.removeTagExtends` hang with tag-only
+  arguments (no block involved), independently reproduced across two separate
+  sessions. `add_tag_extends`/`remove_tag_extends` stay routed to `Editor.*`.
+- `logseq.cli.updateBlock` hangs. `update_block` stays routed to
+  `logseq.Editor.updateBlock`.
+- `logseq.cli.createPage` hangs even for a brand-new page. `create_page` stays
+  routed to `logseq.Editor.createPage`.
+- `logseq.cli.getPagesFromNamespace`/`logseq.cli.getPagesTreeFromNamespace` are
+  not hangs but crash with a clean HTTP 500
+  (`Cannot read properties of undefined (reading 'apply')`) — not viable
+  either way.
+
+Each hang above was independently confirmed responsive-server-otherwise:
+another `cli.*` call made immediately before and after each timeout returned
+normally in milliseconds, ruling out a global wedge masking a per-method issue.
+
+### Confirmed-safe DB CLI methods promoted from candidate to verified (2026-08-23)
+
+`get_property`, `get_tag`, `get_tags_by_name`, `get_tag_objects`, `create_tag`,
+`add_tag_property`, and `remove_tag_property` were each live-tested directly
+(real non-null responses, verified committed effects for the mutating ones)
+and promoted to `logseq.cli.*` in `GRAPH_OPERATION_ROUTES`.
+
+`logseq.cli.upsertProperty` is not viable for creating a new property from an
+external (non-plugin) caller: it returns a clean HTTP 500
+`"Plugins can only upsert its own properties"`. This is Logseq's actual
+ownership model for plugin-namespaced writes, not a bug — and it's the same
+reason bare-name creates land under `:plugin.*._test_plugin/*` via `Editor.*`
+too. `upsert_property` stays on `Editor.*` (same behavior either way) with the
+documented recommendation to create new properties via `upsert_nodes` instead.
 
 ### Known DB property/tag pitfalls (live-tested)
 

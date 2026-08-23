@@ -18,6 +18,34 @@ class TestLogSeqAPI:
         assert manifest["get_block"]["db_status"] == "rejected"
         assert manifest["get_block"]["db_fallback_method"] == "logseq.Editor.getBlock"
 
+    def test_route_manifest_second_verification_pass(self, mock_api_key):
+        """Live-tested 2026-08-23: a second round of cli.* candidates, verified
+        independently of the get_block/getBlockProperties hangs above."""
+        manifest = LogSeq.api_route_manifest()
+
+        for operation, method in (
+            ("get_property", "logseq.cli.getProperty"),
+            ("get_tag", "logseq.cli.getTag"),
+            ("get_tags_by_name", "logseq.cli.getTagsByName"),
+            ("get_tag_objects", "logseq.cli.getTagObjects"),
+            ("create_tag", "logseq.cli.createTag"),
+            ("add_tag_property", "logseq.cli.addTagProperty"),
+            ("remove_tag_property", "logseq.cli.removeTagProperty"),
+        ):
+            assert manifest[operation]["db_method"] == method
+            assert manifest[operation]["db_status"] == "verified"
+
+        for operation, method in (
+            ("get_block_property", "logseq.cli.getBlockProperty"),
+            ("add_tag_extends", "logseq.cli.addTagExtends"),
+            ("remove_tag_extends", "logseq.cli.removeTagExtends"),
+            ("update_block", "logseq.cli.updateBlock"),
+            ("create_page", "logseq.cli.createPage"),
+        ):
+            assert manifest[operation]["db_method"] == method
+            assert manifest[operation]["db_status"] == "rejected"
+            assert manifest[operation]["db_fallback_method"] == manifest[operation]["file_method"]
+
     def test_db_route_uses_verified_cli_method(self, mock_api_key):
         client = LogSeq(api_key=mock_api_key, db_mode=True)
 

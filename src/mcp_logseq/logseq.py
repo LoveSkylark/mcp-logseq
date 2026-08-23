@@ -55,6 +55,71 @@ GRAPH_OPERATION_ROUTES: dict[str, GraphOperationRoute] = {
         db_fallback_method="logseq.Editor.getBlockProperties",
         notes="Rejected: logseq.cli.getBlockProperties hangs (HTTP 0, 20s timeout) even with a bare block UUID argument.",
     ),
+    # The following were live-tested against Logseq 2.0.1 on 2026-08-23 by
+    # calling each candidate directly and confirming both a real (non-null)
+    # response and that other cli.* calls made immediately before/after
+    # stayed responsive (ruling out a global wedge masking a per-call hang).
+    "get_property": GraphOperationRoute(
+        "logseq.Editor.getProperty", "logseq.cli.getProperty", "verified"
+    ),
+    "get_tag": GraphOperationRoute(
+        "logseq.Editor.getTag", "logseq.cli.getTag", "verified"
+    ),
+    "get_tags_by_name": GraphOperationRoute(
+        "logseq.Editor.getTagsByName", "logseq.cli.getTagsByName", "verified"
+    ),
+    "get_tag_objects": GraphOperationRoute(
+        "logseq.Editor.getTagObjects", "logseq.cli.getTagObjects", "verified"
+    ),
+    "create_tag": GraphOperationRoute(
+        "logseq.Editor.createTag", "logseq.cli.createTag", "verified",
+        notes="Both namespaces mint the same :plugin.class._test_plugin/* junk ident for "
+        "externally-called (non-plugin) writes; that's Logseq's ownership model, not a bug.",
+    ),
+    "add_tag_property": GraphOperationRoute(
+        "logseq.Editor.addTagProperty", "logseq.cli.addTagProperty", "verified"
+    ),
+    "remove_tag_property": GraphOperationRoute(
+        "logseq.Editor.removeTagProperty", "logseq.cli.removeTagProperty", "verified"
+    ),
+    # Confirmed hangs (HTTP 0 timeout) via cli.*, independent of the get_block
+    # family above — server stayed responsive to other cli.* calls around
+    # each one, ruling out contamination from an earlier stuck call.
+    "get_block_property": GraphOperationRoute(
+        "logseq.Editor.getBlockProperty",
+        "logseq.cli.getBlockProperty",
+        "rejected",
+        db_fallback_method="logseq.Editor.getBlockProperty",
+        notes="Rejected: logseq.cli.getBlockProperty hangs (HTTP 0, 8s timeout).",
+    ),
+    "add_tag_extends": GraphOperationRoute(
+        "logseq.Editor.addTagExtends",
+        "logseq.cli.addTagExtends",
+        "rejected",
+        db_fallback_method="logseq.Editor.addTagExtends",
+        notes="Rejected: logseq.cli.addTagExtends hangs (HTTP 0, 8s timeout) with tag-only arguments.",
+    ),
+    "remove_tag_extends": GraphOperationRoute(
+        "logseq.Editor.removeTagExtends",
+        "logseq.cli.removeTagExtends",
+        "rejected",
+        db_fallback_method="logseq.Editor.removeTagExtends",
+        notes="Rejected: logseq.cli.removeTagExtends hangs (HTTP 0, 8s timeout).",
+    ),
+    "update_block": GraphOperationRoute(
+        "logseq.Editor.updateBlock",
+        "logseq.cli.updateBlock",
+        "rejected",
+        db_fallback_method="logseq.Editor.updateBlock",
+        notes="Rejected: logseq.cli.updateBlock hangs (HTTP 0, 8s timeout).",
+    ),
+    "create_page": GraphOperationRoute(
+        "logseq.Editor.createPage",
+        "logseq.cli.createPage",
+        "rejected",
+        db_fallback_method="logseq.Editor.createPage",
+        notes="Rejected: logseq.cli.createPage hangs (HTTP 0, 8s timeout) even for a brand-new page.",
+    ),
 }
 
 
@@ -291,7 +356,7 @@ class LogSeq:
     def get_property(self, property_name: str) -> Any:
         if self.db_mode:
             property_name = self.resolve_property_ident(property_name) or property_name
-        return self._call_api("logseq.Editor.getProperty", [property_name])
+        return self._call_api(self._method_for("get_property"), [property_name])
 
     def upsert_property(
         self, property_name: str, schema: dict | None = None, options: dict | None = None
@@ -315,7 +380,7 @@ class LogSeq:
         if self.db_mode:
             property_name = self.resolve_property_ident(property_name) or property_name
         return self._call_api(
-            "logseq.Editor.getBlockProperty", [block_uuid, property_name]
+            self._method_for("get_block_property"), [block_uuid, property_name]
         )
 
     def remove_block_property(self, block_uuid: str, property_name: str) -> Any:
@@ -338,35 +403,35 @@ class LogSeq:
         )
 
     def get_tag(self, tag_name_or_ident: str) -> Any:
-        return self._call_api("logseq.Editor.getTag", [tag_name_or_ident])
+        return self._call_api(self._method_for("get_tag"), [tag_name_or_ident])
 
     def get_tags_by_name(self, tag_name: str) -> Any:
-        return self._call_api("logseq.Editor.getTagsByName", [tag_name])
+        return self._call_api(self._method_for("get_tags_by_name"), [tag_name])
 
     def get_tag_objects(self, tag_name_or_ident: str) -> Any:
-        return self._call_api("logseq.Editor.getTagObjects", [tag_name_or_ident])
+        return self._call_api(self._method_for("get_tag_objects"), [tag_name_or_ident])
 
     def create_tag(self, tag_name: str, options: dict | None = None) -> Any:
-        return self._call_api("logseq.Editor.createTag", [tag_name, options or {}])
+        return self._call_api(self._method_for("create_tag"), [tag_name, options or {}])
 
     def add_tag_property(self, tag_id: str, property_id_or_name: str) -> Any:
         return self._call_api(
-            "logseq.Editor.addTagProperty", [tag_id, property_id_or_name]
+            self._method_for("add_tag_property"), [tag_id, property_id_or_name]
         )
 
     def remove_tag_property(self, tag_id: str, property_id_or_name: str) -> Any:
         return self._call_api(
-            "logseq.Editor.removeTagProperty", [tag_id, property_id_or_name]
+            self._method_for("remove_tag_property"), [tag_id, property_id_or_name]
         )
 
     def add_tag_extends(self, tag_id: str, parent_tag_id_or_name: str) -> Any:
         return self._call_api(
-            "logseq.Editor.addTagExtends", [tag_id, parent_tag_id_or_name]
+            self._method_for("add_tag_extends"), [tag_id, parent_tag_id_or_name]
         )
 
     def remove_tag_extends(self, tag_id: str, parent_tag_id_or_name: str) -> Any:
         return self._call_api(
-            "logseq.Editor.removeTagExtends", [tag_id, parent_tag_id_or_name]
+            self._method_for("remove_tag_extends"), [tag_id, parent_tag_id_or_name]
         )
 
     def add_block_tag(self, block_uuid: str, tag_id: str) -> Any:
