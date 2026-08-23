@@ -975,7 +975,7 @@ class TestGetBlock:
             status=200,
         )
 
-        with pytest.raises(ValueError, match="not found on page"):
+        with pytest.raises(ValueError, match="not found among page"):
             logseq_client_db.get_block_from_page_data("Test Page", "abc-123")
 
         request_body = json.loads(responses.calls[0].request.body)

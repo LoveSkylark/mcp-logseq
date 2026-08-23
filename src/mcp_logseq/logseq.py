@@ -1492,24 +1492,27 @@ class LogSeq:
             raise
 
     def get_block_from_page_data(self, page_name: str, block_uuid: str) -> Any:
-        """Read a DB page and return a top-level block by UUID."""
+        """Read a DB page's direct child blocks and return one by UUID.
+
+        get_page_data only returns the page's direct children (a documented
+        Logseq API limitation, not a bug here) -- a deeper-nested block will
+        not be present and this raises.
+        """
         page_data = self.get_page_data(page_name)
         if not isinstance(page_data, dict) or page_data.get("error"):
             raise ValueError(f"Page '{page_name}' not found")
 
-        def find_block(blocks: list[Any]) -> dict | None:
-            for block in blocks:
-                if not isinstance(block, dict):
-                    continue
-                candidate_uuid = str(block.get("uuid") or block.get("block/uuid") or "")
-                if candidate_uuid == block_uuid:
-                    return block
-            return None
+        for block in page_data.get("blocks") or []:
+            if not isinstance(block, dict):
+                continue
+            candidate_uuid = str(block.get("uuid") or block.get("block/uuid") or "")
+            if candidate_uuid == block_uuid:
+                return block
 
-        block = find_block(page_data.get("blocks") or [])
-        if block is None:
-            raise ValueError(f"Block '{block_uuid}' not found on page '{page_name}'")
-        return block
+        raise ValueError(
+            f"Block '{block_uuid}' not found among page '{page_name}''s direct "
+            "children (get_page_data cannot see deeper-nested blocks)"
+        )
 
     def _get_page_name_by_id(self, page_id) -> str | None:
         """Resolve a page's human-readable name from its db id (or uuid)."""

@@ -1065,7 +1065,7 @@ class GetBlockToolHandler(ToolHandler):
                     },
                     "page_name": {
                         "type": "string",
-                        "description": "Unused in DB mode (get_page_data-backed lookups only see top-level blocks and miss content on nested ones). Kept for file-graph compatibility only.",
+                        "description": "Owning page name or UUID. REQUIRED in DB mode: get_block has no working DB route, so DB reads go through get_page_data instead. Only sees the page's DIRECT children (a Logseq API limit) — a deeper-nested block will not be found this way.",
                     },
                     "include_children": {
                         "type": "boolean",
@@ -1088,16 +1088,24 @@ class GetBlockToolHandler(ToolHandler):
             raise RuntimeError("block_uuid argument required")
 
         block_uuid = args["block_uuid"]
+        page_name = args.get("page_name")
         include_children = args.get("include_children", True)
         output_format = args.get("format", "text")
 
         try:
             api = _make_api()
-            # page_name is accepted but unused: get_block_from_page_data only
-            # sees top-level blocks and misses nested content (live-tested).
-            _enforce_block_namespace_access(api, block_uuid)
-            _enforce_block_tag_access(api, block_uuid)
-            result = api.get_block(block_uuid, include_children=include_children)
+            if _get_db_mode() and page_name:
+                # get_block has no working DB route (its cli.getBlock candidate
+                # hangs); read via get_page_data's direct-children list instead.
+                _enforce_namespace_access(page_name)
+                _enforce_page_tag_access(api, page_name)
+                result = _normalize_db_block(
+                    api.get_block_from_page_data(page_name, block_uuid)
+                )
+            else:
+                _enforce_block_namespace_access(api, block_uuid)
+                _enforce_block_tag_access(api, block_uuid)
+                result = api.get_block(block_uuid, include_children=include_children)
 
             if output_format == "json":
                 return [TextContent(type="text", text=json.dumps(result, indent=2))]
@@ -2721,38 +2729,105 @@ class RemovePropertyToolHandler(_DBToolHandler):
         return self._execute(args)
 
 
-class GetBlockPropertiesToolHandler(_DBToolHandler):
-    def __init__(self): super().__init__("get_block_properties")
+class GetBlockPropertiesToolHandler(ToolHandler):
+    def __init__(self):
+        super().__init__("get_block_properties")
+
     def get_tool_description(self):
         return Tool(name=self.name, description="Get all typed properties on a DB node.", inputSchema={
-            "type": "object", "properties": {"block_uuid": {"type": "string"}},
+            "type": "object", "properties": {
+                "block_uuid": {"type": "string"},
+                "page_name": {
+                    "type": "string",
+                    "description": "Owning page name or UUID. REQUIRED in DB mode: get_block_properties has "
+                    "no working DB route, so DB reads go through get_page_data + datascript instead.",
+                },
+            },
             "required": ["block_uuid"],
         })
-    def _call(self, api, args):
-        _enforce_block_namespace_access(api, args["block_uuid"])
-        _enforce_block_tag_access(api, args["block_uuid"])
-        return api.get_block_properties(args["block_uuid"])
-    def run_tool(self, args):
-        if "block_uuid" not in args: raise RuntimeError("block_uuid argument required")
-        return self._execute(args)
+
+    def run_tool(self, args: dict) -> list[TextContent]:
+        if "block_uuid" not in args:
+            raise RuntimeError("block_uuid argument required")
+        if not _get_db_mode():
+            return [TextContent(
+                type="text",
+                text="get_block_properties is available only for Logseq 2.x DB graphs. "
+                "Set LOGSEQ_DB_MODE=true.",
+            )]
+
+        block_uuid = args["block_uuid"]
+        page_name = args.get("page_name")
+        try:
+            api = _make_api()
+            if page_name:
+                # get_block_properties has no working DB route (its cli.* candidate
+                # hangs); read via get_page_data + datascript properties instead.
+                _enforce_namespace_access(page_name)
+                _enforce_page_tag_access(api, page_name)
+                block = api.get_block_from_page_data(page_name, block_uuid)
+                db_properties = api.get_blocks_db_properties([block])
+                result = db_properties.get(block_uuid, {})
+            else:
+                _enforce_block_namespace_access(api, block_uuid)
+                _enforce_block_tag_access(api, block_uuid)
+                result = api.get_block_properties(block_uuid)
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+        except AccessDenied:
+            raise
+        except Exception as e:
+            return [TextContent(type="text", text=f"get_block_properties failed: {str(e)}")]
 
 
-class GetBlockPropertyToolHandler(_DBToolHandler):
-    def __init__(self): super().__init__("get_block_property")
+class GetBlockPropertyToolHandler(ToolHandler):
+    def __init__(self):
+        super().__init__("get_block_property")
+
     def get_tool_description(self):
         return Tool(name=self.name, description="Get one typed property from a DB node.", inputSchema={
             "type": "object", "properties": {
                 "block_uuid": {"type": "string"}, "property_name": {"type": "string"},
+                "page_name": {
+                    "type": "string",
+                    "description": "Owning page name or UUID. REQUIRED in DB mode: get_block_property has "
+                    "no working DB route, so DB reads go through get_page_data + datascript instead.",
+                },
             }, "required": ["block_uuid", "property_name"],
         })
-    def _call(self, api, args):
-        _enforce_block_namespace_access(api, args["block_uuid"])
-        _enforce_block_tag_access(api, args["block_uuid"])
-        return api.get_block_property(args["block_uuid"], args["property_name"])
-    def run_tool(self, args):
+
+    def run_tool(self, args: dict) -> list[TextContent]:
         for key in ("block_uuid", "property_name"):
-            if key not in args: raise RuntimeError(f"{key} argument required")
-        return self._execute(args)
+            if key not in args:
+                raise RuntimeError(f"{key} argument required")
+        if not _get_db_mode():
+            return [TextContent(
+                type="text",
+                text="get_block_property is available only for Logseq 2.x DB graphs. "
+                "Set LOGSEQ_DB_MODE=true.",
+            )]
+
+        block_uuid = args["block_uuid"]
+        property_name = args["property_name"]
+        page_name = args.get("page_name")
+        try:
+            api = _make_api()
+            if page_name:
+                # get_block_property has no working DB route (its cli.* candidate
+                # hangs); read via get_page_data + datascript properties instead.
+                _enforce_namespace_access(page_name)
+                _enforce_page_tag_access(api, page_name)
+                block = api.get_block_from_page_data(page_name, block_uuid)
+                db_properties = api.get_blocks_db_properties([block])
+                result = db_properties.get(block_uuid, {}).get(property_name)
+            else:
+                _enforce_block_namespace_access(api, block_uuid)
+                _enforce_block_tag_access(api, block_uuid)
+                result = api.get_block_property(block_uuid, property_name)
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+        except AccessDenied:
+            raise
+        except Exception as e:
+            return [TextContent(type="text", text=f"get_block_property failed: {str(e)}")]
 
 
 class UpsertBlockPropertyToolHandler(_DBToolHandler):

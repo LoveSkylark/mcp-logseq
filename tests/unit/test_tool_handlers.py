@@ -1923,12 +1923,11 @@ class TestGetBlockToolHandler:
 
     @patch.dict("os.environ", {"LOGSEQ_API_TOKEN": "test_token", "LOGSEQ_DB_MODE": "true"})
     @patch("mcp_logseq.tools.logseq.LogSeq")
-    def test_db_run_tool_ignores_page_name_and_uses_get_block(self, mock_logseq_class):
-        """page_name is accepted but ignored: get_block_from_page_data only sees
-        top-level blocks and misses nested content, so DB reads always use the
-        direct getBlock path (live-tested on Logseq 2.0.1)."""
+    def test_db_run_tool_uses_page_data_when_page_is_supplied(self, mock_logseq_class):
+        """get_block has no working DB route (its cli.getBlock candidate hangs),
+        so a DB read with page_name goes through get_page_data's direct children."""
         mock_api = Mock()
-        mock_api.get_block.return_value = {
+        mock_api.get_block_from_page_data.return_value = {
             "uuid": "abc-123", "content": "Block content", "children": []
         }
         mock_logseq_class.return_value = mock_api
@@ -1936,9 +1935,24 @@ class TestGetBlockToolHandler:
         handler = GetBlockToolHandler()
         result = handler.run_tool({"block_uuid": "abc-123", "page_name": "Test Page"})
 
-        mock_api.get_block.assert_called_once_with("abc-123", include_children=True)
-        mock_api.get_block_from_page_data.assert_not_called()
+        mock_api.get_block_from_page_data.assert_called_once_with("Test Page", "abc-123")
+        mock_api.get_block.assert_not_called()
         assert "Block content" in result[0].text
+
+    @patch.dict("os.environ", {"LOGSEQ_API_TOKEN": "test_token", "LOGSEQ_DB_MODE": "true"})
+    @patch("mcp_logseq.tools.logseq.LogSeq")
+    def test_db_run_tool_without_page_name_raises(self, mock_logseq_class):
+        """DB mode without page_name has no working get_block route at all."""
+        mock_api = Mock()
+        mock_api.get_block.side_effect = RuntimeError(
+            "get_block is not available for Logseq DB graphs (db_status=rejected)"
+        )
+        mock_logseq_class.return_value = mock_api
+
+        handler = GetBlockToolHandler()
+        result = handler.run_tool({"block_uuid": "abc-123"})
+
+        assert "not available for Logseq DB graphs" in result[0].text
 
     @patch.dict("os.environ", {"LOGSEQ_API_TOKEN": "test_token"})
     def test_run_tool_missing_block_uuid(self):
