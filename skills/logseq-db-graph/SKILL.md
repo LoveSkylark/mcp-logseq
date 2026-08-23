@@ -8,6 +8,16 @@ description: Detailed rules for safely reading, planning, and writing a Logseq 2
 This skill applies only to a Logseq 2.0.x DB graph. The MCP server must run
 with `LOGSEQ_DB_MODE=true`. Do not use this skill with a Markdown/file graph.
 
+This server communicates with a DB graph through `logseq.cli.*`/`logseq.app.*`
+only. It never uses `logseq.Editor.*` for a DB graph -- that namespace is the
+file-graph adapter and is wired to a completely separate skill. You do not
+choose or influence which namespace is used; call the MCP tool names in this
+skill (`get_block`, `upsert_nodes`, `delete_block`, and so on) and the server
+always resolves each one to its `cli.*`/`app.*` DB route. If you see or are
+asked about `Editor.*` behavior while this skill is active, that is a sign the
+wrong skill or graph mode is in effect -- stop and confirm `LOGSEQ_DB_MODE` is
+`true` before continuing.
+
 ## Scope and configuration
 
 This skill is deliberately DB-only. Use a dedicated MCP server with:
@@ -117,7 +127,7 @@ plugin-namespaced duplicates and are the canonical DB representation.
 ## Deploy mutations
 
 Use `upsert_nodes` for related changes. It is the DB-native batch boundary and
-avoids repeated individual `Editor.*` writes.
+avoids repeated individual single-node writes.
 
 1. Convert the completed in-memory plan into `operations`.
 2. Use `add` or `edit` with `entityType` of `page`, `block`, `tag`, or
@@ -136,10 +146,9 @@ batch, use the matching DB property/tag handler only after reading the current
 entity and schema. `update_block`, `insert_nested_block`, `upsert_block_property`,
 `remove_block_property`, `add_block_tag`, `remove_block_tag`, `add_tag_extends`,
 `remove_tag_extends`, `upsert_property`, `remove_property`, and `create_page`
-all work on DB graphs for exactly this case -- each is a single `Editor.*`/
-`cli.*` write, so prefer `upsert_nodes` for anything batchable (especially a
-new page plus its blocks/tags/properties in one call) and reserve these for
-one-off edits.
+all work on DB graphs for exactly this case -- each is a single `cli.*` write,
+so prefer `upsert_nodes` for anything batchable (especially a new page plus
+its blocks/tags/properties in one call) and reserve these for one-off edits.
 
 ### Verified batch semantics
 
@@ -151,7 +160,7 @@ one-off edits.
 - One batch can add or edit `block`, `page`, `tag`, and `property` nodes. Use
   temporary IDs to connect dependent additions inside the same batch.
 - This is the preferred path for bulk imports and related edits. It avoids the
-  repeated `Editor.*` write pattern that can wedge Logseq.
+  repeated single-write pattern that can wedge Logseq.
 - `upsert_nodes` is flat-only in Logseq 2.0.1. Do not send `parent-id`,
   `parent`, `block/parent`, `properties`, `order`, or other undocumented keys.
   Strict validation rejects these by default; `LOGSEQ_UPSERT_STRICT=false` is a
@@ -201,11 +210,11 @@ does not depend on the page's direct-children list.
 - If a correction resolves an obsolete question or placeholder, remove or
   replace the obsolete material in the same planned change.
 
-Avoid repeated individual `Editor.*` writes: Logseq 2.0.1 can wedge after a
-small run of them, and a wedged write can make an otherwise-working route
-(e.g. `delete_block`) look permanently broken when it is really just stuck
-until a Logseq restart. A timed-out write may have committed, so read back
-before retrying.
+Avoid repeated individual single-node writes: Logseq 2.0.1 can wedge its write
+path after a small run of them, and a wedged write can make an otherwise-
+working route (e.g. `delete_block`) look permanently broken when it is really
+just stuck until a Logseq restart. A timed-out write may have committed, so
+read back before retrying.
 
 ## Text formatting rules
 
@@ -234,13 +243,15 @@ before retrying.
 
 - A first-time timeout usually indicates an unsafe argument shape. Stop and
   compare arguments to the verified workflow before retrying, and consider
-  whether prior failed writes in the same session have wedged the `Editor.*`
-  path (a restart clears it) rather than assuming the route is broken.
+  whether prior failed writes in the same session have wedged the write path
+  (a Logseq restart clears it) rather than assuming the route is broken.
 - `get_block(include_children=false)` is a known Logseq 2.0.1 hang. Always use
   `true`.
-- `Editor.getPageBlocksTree` is a known DB-mode hang. Use `get_page_data`.
-- If a previously successful `Editor.*` call begins timing out while search
-  still works, Logseq is wedged. Stop issuing Editor calls, verify state with
+- `get_page_data` is the DB-native page reader; prefer it directly over
+  `get_page_content` for clarity, even though `get_page_content` also works
+  in DB mode now (it delegates to `get_page_data` internally).
+- If a previously successful write call begins timing out while search still
+  works, Logseq is wedged. Stop issuing write calls, verify state with
   search, then restart Logseq, restart its HTTP API server, and start a new
   Claude conversation.
 - A timed-out write may have committed. Search or read page data before any
