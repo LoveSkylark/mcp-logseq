@@ -309,7 +309,12 @@ class TestLogSeqAPI:
             status=200,
         )
 
-        assert logseq_client_db.get_page_blocks("Test Page") == [{"block/uuid": "block-uuid"}]
+        assert logseq_client_db.get_page_blocks("Test Page") == [{
+            "block/uuid": "block-uuid",
+            "uuid": "block-uuid",
+            "content": "",
+            "children": [],
+        }]
         request_data = json.loads(responses.calls[0].request.body)
         assert request_data == {"method": "logseq.cli.getPageData", "args": ["Test Page"]}
 

@@ -71,7 +71,9 @@ _WRITE_TOOL_NAMES = frozenset(
         "create_tag",
         "add_block_tag",
         "remove_block_tag",
+        "add_tag_property",
         "remove_tag_property",
+        "add_tag_extends",
         "remove_tag_extends",
     }
 )

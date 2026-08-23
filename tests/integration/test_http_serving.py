@@ -237,6 +237,8 @@ def test_read_only_served_app_omits_write_tools(monkeypatch):
     handlers = _served_handlers(read_only=True)
     for name in _WRITE_TOOL_NAMES:
         assert name not in handlers, f"{name} must be absent under read_only"
+    for name in ["add_tag_property", "add_tag_extends"]:
+        assert name not in handlers, f"{name} must be absent under read_only"
     for name in [
         "list_pages",
         "get_page_content",

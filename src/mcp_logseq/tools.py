@@ -354,7 +354,7 @@ class CreatePageToolHandler(ToolHandler):
         return Tool(
             name=self.name,
                         description=(
-                                "Create a page from Markdown. Existing page names are rejected to make "
+                                "Create a new page in Logseq from Markdown. Existing page names are rejected to make "
                                 "retries safe. Headings and lists become nested blocks; YAML frontmatter "
                                 "and explicit properties become page properties."
                         ),
@@ -559,7 +559,7 @@ class GetPageContentToolHandler(ToolHandler):
 
             # DB-mode class properties (from datascript query)
             block_uuid = str(block.get("uuid", ""))
-            if db_properties and block_uuid in db_properties:
+            if isinstance(db_properties, dict) and block_uuid in db_properties:
                 for key, value in db_properties[block_uuid].items():
                     lines.append(f"{indent}  {key}:: {value}")
 

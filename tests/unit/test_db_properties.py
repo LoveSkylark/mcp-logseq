@@ -641,17 +641,13 @@ class TestGetPageContentResolveRefs:
     def test_resolve_refs_enabled_in_db_mode(self):
         """UUID refs are resolved when LOGSEQ_DB_MODE is on and resolve_refs is true."""
         api_url = "http://localhost:12315/api"
-        # getPage
+        # DB-native getPageData
         responses.add(responses.POST, api_url,
-            json={"id": 1, "name": "Test", "originalName": "Test", "uuid": "page-uuid"},
-            status=200)
-        # getPageBlocksTree
-        responses.add(responses.POST, api_url,
-            json=[{
-                "id": 1, "uuid": "b1",
-                "content": "See [[aaaa1111-2222-3333-4444-555566667777]]",
-                "properties": {}, "children": [],
-            }],
+            json={"entity": {"id": 1, "name": "Test", "originalName": "Test", "uuid": "page-uuid"},
+                  "blocks": [{
+                      "block/uuid": "b1",
+                      "block/title": "See [[aaaa1111-2222-3333-4444-555566667777]]",
+                  }]},
             status=200)
         # resolve_page_uuids -> getPage for the UUID
         responses.add(responses.POST, api_url,
@@ -719,14 +715,11 @@ class TestGetPageContentResolveRefs:
         """JSON format includes resolved_refs mapping in DB mode."""
         api_url = "http://localhost:12315/api"
         responses.add(responses.POST, api_url,
-            json={"id": 1, "name": "Test", "originalName": "Test", "uuid": "page-uuid"},
-            status=200)
-        responses.add(responses.POST, api_url,
-            json=[{
-                "id": 1, "uuid": "b1",
-                "content": "See [[aaaa1111-2222-3333-4444-555566667777]]",
-                "properties": {}, "children": [],
-            }],
+            json={"entity": {"id": 1, "name": "Test", "originalName": "Test", "uuid": "page-uuid"},
+                  "blocks": [{
+                      "block/uuid": "b1",
+                      "block/title": "See [[aaaa1111-2222-3333-4444-555566667777]]",
+                  }]},
             status=200)
         responses.add(responses.POST, api_url,
             json={"id": 2, "name": "target", "originalName": "Target", "uuid": "aaaa1111-2222-3333-4444-555566667777"},

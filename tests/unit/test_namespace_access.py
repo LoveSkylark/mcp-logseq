@@ -1008,6 +1008,8 @@ def test_read_only_unregisters_all_write_tools():
     _, handlers = build_app(read_only=True)
     for name in _GENUINE_WRITE_TOOLS:
         assert name not in handlers, f"{name} must be absent under read_only"
+    for name in ["add_tag_property", "add_tag_extends"]:
+        assert name not in handlers, f"{name} must be absent under read_only"
 
 
 def test_read_only_keeps_read_tools():

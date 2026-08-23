@@ -400,7 +400,22 @@ class LogSeq:
             page_data = self.get_page_data(page_name)
             if not page_data or not isinstance(page_data, dict) or page_data.get("error"):
                 return []
-            return page_data.get("blocks") or []
+
+            def normalize_block(block: dict) -> dict:
+                normalized = dict(block)
+                normalized.setdefault("uuid", block.get("block/uuid"))
+                normalized.setdefault("content", block.get("block/title", ""))
+                children = block.get("children", block.get("block/children", [])) or []
+                normalized["children"] = [
+                    normalize_block(child) for child in children if isinstance(child, dict)
+                ]
+                return normalized
+
+            return [
+                normalize_block(block)
+                for block in page_data.get("blocks", [])
+                if isinstance(block, dict)
+            ]
 
         url = self.get_base_url()
         logger.info(f"Getting blocks for page '{page_name}'")

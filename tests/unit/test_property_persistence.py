@@ -105,7 +105,10 @@ class TestUpdatePageProperties:
         """DB graphs: append merges with existing page-level props via setPageProperties."""
         url = "http://127.0.0.1:12315/api"
         responses.add(responses.POST, url, json=[{"name": "Test Page", "originalName": "Test Page"}], status=200)  # list_pages
-        responses.add(responses.POST, url, json=[{"uuid": "block-1", "content": "Existing"}], status=200)  # get last block
+        responses.add(responses.POST, url, json={
+            "entity": {"block/title": "Test Page"},
+            "blocks": [{"block/uuid": "block-1", "block/title": "Existing"}],
+        }, status=200)  # DB-native getPageData
         responses.add(responses.POST, url, json=[{"uuid": "block-2"}], status=200)  # insertBatchBlock
         responses.add(responses.POST, url, json={"name": "Test Page", "properties": {"priority": "low", "status": "old"}}, status=200)  # getPage
         responses.add(responses.POST, url, json=True, status=200)  # setPageProperties
@@ -134,7 +137,10 @@ class TestUpdatePageProperties:
         """DB graphs: replace writes only the new props via setPageProperties."""
         url = "http://127.0.0.1:12315/api"
         responses.add(responses.POST, url, json=[{"name": "Test Page", "originalName": "Test Page"}], status=200)  # list_pages
-        responses.add(responses.POST, url, json=[{"uuid": "block-1", "content": "Old", "properties": {"status": "old"}}], status=200)  # clear: get blocks
+        responses.add(responses.POST, url, json={
+            "entity": {"block/title": "Test Page"},
+            "blocks": [{"block/uuid": "block-1", "block/title": "Old"}],
+        }, status=200)  # clear: DB-native getPageData
         responses.add(responses.POST, url, json=True, status=200)  # removeBlock
         responses.add(responses.POST, url, json={"uuid": "block-2", "content": "New"}, status=200)  # appendBlockInPage
         responses.add(responses.POST, url, json=True, status=200)  # setPageProperties
