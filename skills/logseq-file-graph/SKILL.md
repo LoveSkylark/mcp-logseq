@@ -3,186 +3,218 @@ name: logseq-file-graph
 description: Detailed rules for safely reading, planning, and writing legacy Logseq Markdown/file graphs through mcp-logseq. Use Markdown pages, key:: value properties, page names, and targeted Editor-backed tools. Never use DB-node workflows.
 ---
 
-# Logseq File Graphs over MCP
+# Logseq DB Graphs over MCP
 
-This skill applies only to a legacy Logseq Markdown/file graph. The MCP server
-must run with `LOGSEQ_DB_MODE=false`. Do not use this skill with a Logseq 2.x
-DB graph.
+This skill applies only to a Logseq 2.0.x DB graph. The MCP server must run
+with `LOGSEQ_DB_MODE=true`. Do not use this skill with a Markdown/file graph.
 
-This server communicates with a file graph through `logseq.Editor.*`/
-`logseq.App.*` only. It never uses `logseq.cli.*`/`logseq.app.*` for a file
-graph -- that namespace is the DB-native adapter and is wired to a completely
-separate skill. You do not choose or influence which namespace is used; call
-the MCP tool names in this skill (`get_block`, `create_page`, `update_page`,
-and so on) and the server always resolves each one to its `Editor.*`/`App.*`
-file route. If you see or are asked about `cli.*` behavior, DB node UUIDs,
-typed properties, or `upsert_nodes` while this skill is active, that is a sign
-the wrong skill or graph mode is in effect -- stop and confirm `LOGSEQ_DB_MODE`
-is `false` before continuing.
+This server communicates with a DB graph through `logseq.cli.*`/`logseq.app.*`
+only. It never uses `logseq.Editor.*` for a DB graph -- that namespace is the
+file-graph adapter and is wired to a completely separate skill. You do not
+choose or influence which namespace is used; call the MCP tool names in this
+skill (`get_block`, `upsert_nodes`, `delete_block`, and so on) and the server
+always resolves each one to its `cli.*`/`app.*` DB route. If you see or are
+asked about `Editor.*` behavior while this skill is active, that is a sign the
+wrong skill or graph mode is in effect -- stop and confirm `LOGSEQ_DB_MODE` is
+`true` before continuing.
 
 ## Scope and configuration
 
-This skill is deliberately file-graph-only. Use a dedicated MCP server with:
+This skill is deliberately DB-only. Use a dedicated MCP server with:
 
 ```json
 {
-  "LOGSEQ_DB_MODE": "false",
+  "LOGSEQ_DB_MODE": "true",
   "LOGSEQ_API_CONNECT_TIMEOUT": "10",
   "LOGSEQ_API_READ_TIMEOUT": "60",
   "PYTHONIOENCODING": "utf-8"
 }
 ```
 
-Do not use `LOGSEQ_DB_MODE=auto` with this skill. Do not load the DB-graph
+Do not use `LOGSEQ_DB_MODE=auto` with this skill. Do not load the file-graph
 skill in the same Claude conversation.
 
-## File-graph data model
+## DB data model
 
-- Pages are Markdown files and are addressed by page name.
-- Properties use `key:: value` syntax and Markdown-compatible values.
-- Nested blocks form the page's Markdown outline.
-- Slash-separated page names represent namespaces.
+- Pages, blocks, tags, and properties are DB nodes identified by UUIDs or DB IDs.
+- Properties are typed; do not write Markdown `key:: value` lines.
+- Tags are first-class class/tag nodes.
+- Use UUID references, not page-name links, when creating DB node relationships.
+- DB endpoints may return namespaced fields (`block/title`, `block/uuid`) or
+  bare fields (`title`, `uuid`). Treat both as valid representations.
 
-Do not import DB-graph assumptions into a file graph:
+Never use these file-graph conventions in a DB graph:
 
-- No `upsert_nodes`, DB node batching, typed property schemas, or tag/class
-  modeling.
-- No `get_page_data`, `search_blocks`, or DB UUID-relationship workflows.
-- Do not treat `block/title`, `block/uuid`, or property entities as the
-  canonical file-graph representation.
-
-## File structure and query schema
-
-### Pages and blocks
-
-- A page is Markdown content addressed by its exact page name.
-- Indented Markdown list items represent parent and child blocks.
-- Block UUIDs identify existing blocks for targeted edits, but page names and
-  Markdown remain the canonical representation of the graph.
-- `[[Page Name]]` creates a page reference. Search before adding a reference
-  when a similarly named page may already exist.
-- A slash in `parent/child` is a file-graph namespace convention. It is not a
-  DB parent relationship.
-
-### Properties
-
-- Use `key:: value` on a property line. Consecutive property lines at the top
-  of a page are page properties; property lines inside a block belong to that
-  block.
-- Preserve an existing YAML frontmatter convention when a page uses it. Do not
-  casually mix frontmatter and inline properties on the same page.
-- Use scalar Markdown-compatible values unless the page already establishes a
-  list or reference convention.
-- File-graph properties are queried by their textual key and value. They are
-  not typed property entities and do not use `logseq.property/*` fields.
-
-### Query vocabulary
-
-Use the file-graph DSL forms:
-
-| Need | File-graph query form |
-| --- | --- |
-| Pages with a property | `(page-property status active)` |
-| Pages carrying a tag | `(page-tags [[Project]])` |
-| Task blocks | `(task todo)` |
-| Priority | `(priority A)` |
-| Combine conditions | `(and (task todo) (page [[Project]]))` |
-
-Do not use DB-only query vocabulary in a file graph: `(property key)`,
-`(tags tag)`, `:block/title`, `:logseq.property/status`, or
-`:logseq.property/priority`.
+- Markdown `key:: value` property lines.
+- YAML frontmatter as a property mechanism.
+- Slash-separated page names as namespace hierarchy.
+- File-page replacement or Markdown parsing to reorganize a DB page.
 
 ## Operational stance
 
-Preserve the page's existing structure and voice. Correct the smallest block
-or property that solves the problem. A change that requires reorganizing a
-page, changing its template, or resolving an ambiguous source needs a user
-decision before mutation.
+Preserve existing material. A factual correction is a targeted block edit, not
+a page rewrite. A change that affects a page's organization, multiple sections,
+or an unclear source of truth requires a user decision before mutation.
+
+Treat every mutation as potentially committed even if the request times out.
+Read back before retrying, and never queue a blind duplicate write.
 
 ## Build the change plan in memory first
 
-Do discovery and reasoning before making the first edit. Build a structured
-plan in the conversation rather than testing ideas by partially changing the
-graph.
+Do all discovery and reasoning before the first mutation. Hold a structured
+change plan in the conversation, not as speculative partial edits in Logseq.
 
-For every planned edit, record:
+For every proposed change, record:
 
 ```text
-target page: exact page name and relevant namespace
-target block: UUID, current content, parent/sibling context
-intent: create | append | replace | edit block | remove block | set property
-replacement: exact final Markdown or property value
+target page: page title and UUID
+target block: block UUID, current text, and parent/page UUID
+intent: create | edit | remove | attach property | attach tag
+replacement: exact final text or typed value
 evidence: source fact or user instruction
-dependencies: required page links, block UUIDs, and page/property checks
-verification: page read or search after commit
+dependencies: required page, block, property, or tag UUIDs
+verification: exact search or page-data check after commit
 ```
 
 Before deployment, check the plan for:
 
-1. Contradictory replacements to the same block or page.
-2. A correction that answers an open question but leaves stale text behind.
-3. Headings, summaries, or links that become inaccurate after the edit.
-4. Broken `[[Page Name]]` links, accidental duplicate page names, or namespace
-   mistakes.
-5. Property values that need normalizing before writing.
+1. Duplicate target blocks or contradictory replacements.
+2. A change that answers an "open question" but leaves the stale question in
+  place.
+3. A heading, summary, or cross-reference made inaccurate by the edit.
+4. Name-based links or property values that should instead reference known UUIDs.
+5. Missing required typed property schemas or tag/class nodes.
 
-Draft all final Markdown before making the first change. Preserve indentation,
-list style, headings, and templates unless the user explicitly requests a
-restructure.
+Draft the final text for all changed blocks before invoking a write tool. Keep
+voice, formatting, and the page's existing structure unless the user requested
+reorganization.
 
 ## Read workflow
 
-1. Use `search` to find pages and blocks, then capture exact page names and
-   block UUIDs.
-2. Use `get_page_content` to read a complete page and its Markdown block tree.
-3. Normalize relevant content in memory: page properties, block UUIDs, current
-   text, parent/child relationships, and incoming/outgoing page references.
-4. Use `get_block` for a known block UUID when only one outline branch needs
-   inspection.
-5. Use `query` and `find_pages_by_property` for file-graph queries.
-6. Use `get_pages_from_namespace` and `get_pages_tree_from_namespace` for
-   namespace navigation.
+1. Use `search_blocks` to find distinctive content and collect page/block UUIDs.
+  Read `content` rather than highlighted search titles.
+2. Use `get_page_data` to obtain the page entity and its direct page-level
+  blocks. Do not assume every nested descendant is present.
+3. Normalize relevant nodes in memory: retain each block's UUID, title/content,
+  parent, children, tags, and typed properties. Do not infer a relationship
+  from display text when a UUID is available.
+4. When inspecting one known block, use `get_block(block_uuid,
+  include_children=true)` directly -- it works in DB mode without needing
+  the owning page.
+5. Use `list_pages`, `list_tags`, and `list_properties` to discover existing
+  entities before creating any of them.
 
-## Write workflow
+Do not use `get_page_content` as the primary DB page reader. Do not pass
+`include_children=false` to `get_block`.
 
-- Use `create_page` with complete initial Markdown only after checking that the
-  target page does not already exist.
-- Use `update_page` in `append` mode for genuinely additive material.
-- Use `update_page` in `replace` mode only after the user explicitly approved a
-  complete page replacement and the replacement text is fully drafted.
-- Use `update_block`, `delete_block`, and `insert_nested_block` for local,
-  minimal-diff outline edits.
-- Use page/block property handlers for Markdown-backed properties.
+## Prepare typed data
 
-Apply changes in dependency order: create required target pages first, then
-insert or update blocks that link to them, then set properties that describe the
-finished content. Verify each significant edit with `get_page_content` or
-`search` before performing a dependent destructive action.
+DB properties and tags are not text decoration.
 
-## Markdown property and namespace rules
+1. Use `list_properties(expand=true)` before creating or assigning a typed
+  property. Confirm its type, cardinality, and any class restrictions.
+2. Use `list_tags(expand=true)` before attaching a tag/class or defining a
+  class relationship.
+3. Resolve existing pages, tags, properties, and target blocks to UUIDs.
+4. Put only exact UUIDs or verified temporary IDs in the mutation plan.
+5. For built-in Logseq concepts, prefer the supported DB API/schema. Do not
+  claim that inserting text such as `alias::` or `tags::` changed a DB property.
 
-- Use `key:: value` only for file-graph page or block properties.
-- Preserve existing property capitalization and value style unless the user
-  requests normalization.
-- Use exact page names in `[[Page Name]]` links. Search first when a target may
-  already exist; do not create near-duplicate pages by guessing casing or a
-  namespace.
-- Treat `project/plan` as a namespace relationship. Check the namespace tree
-  before moving or renaming pages.
-- Use `rename_page` only after reviewing inbound links and same-name conflicts.
+Use full property idents when writing typed properties, for example
+`:logseq.property/status`. Display names can be resolved, but full idents avoid
+plugin-namespaced duplicates and are the canonical DB representation.
 
-## Minimal-diff editing rules
+## Deploy mutations
 
-- Change one block when one statement is wrong.
-- Add a child or sibling only when the intended parent and order are known.
-- Delete a block only when its subtree is intentionally obsolete.
-- Do not replace a full page to correct a sentence.
-- If an edit resolves an obsolete question, placeholder, or contradiction,
-  remove or replace the stale material in the same plan.
-- Preserve voice and template; raise editorial judgment calls instead of making
-  unrequested structural changes.
+Use `upsert_nodes` for related changes. It is the DB-native batch boundary and
+avoids repeated individual single-node writes.
 
-Verify significant edits with `get_page_content` or `search`.
+1. Convert the completed in-memory plan into `operations`.
+2. Use `add` or `edit` with `entityType` of `page`, `block`, `tag`, or
+  `property`.
+3. Give a new entity a unique temporary ID when a later operation in the same
+  batch depends on it.
+4. `upsert_nodes` commits run a `dry_run=true` preflight by default. Repair
+   every reported validation problem in the plan; do not commit a modified
+   subset blindly.
+5. Submit the validated operations with `dry_run=false` once. Disable the
+   preflight only with an explicit `validate_before_commit=false` decision.
+6. Verify the exact expected state with `get_page_data` and `search_blocks`.
+
+For an individual typed property/tag operation that cannot be represented by a
+batch, use the matching DB property/tag handler only after reading the current
+entity and schema. `update_block`, `insert_nested_block`, `upsert_block_property`,
+`remove_block_property`, `add_block_tag`, `remove_block_tag`, `add_tag_extends`,
+`remove_tag_extends`, `upsert_property`, `remove_property`, and `create_page`
+all work on DB graphs for exactly this case -- each is a single `cli.*` write,
+so prefer `upsert_nodes` for anything batchable (especially a new page plus
+its blocks/tags/properties in one call) and reserve these for one-off edits.
+
+### Verified batch semantics
+
+- `dry_run=true` builds the complete DB import data and returns the change
+  summary without committing.
+- A non-dry `upsert_nodes` request applies the complete import through one
+  Logseq `batch-import-edn!` transaction. Logseq reports a transaction error
+  instead of a successful partial summary.
+- One batch can add or edit `block`, `page`, `tag`, and `property` nodes. Use
+  temporary IDs to connect dependent additions inside the same batch.
+- This is the preferred path for bulk imports and related edits. It avoids the
+  repeated single-write pattern that can wedge Logseq.
+- `upsert_nodes` is flat-only in Logseq 2.0.1. Do not send `parent-id`,
+  `parent`, `block/parent`, `properties`, `order`, or other undocumented keys.
+  Strict validation rejects these by default; `LOGSEQ_UPSERT_STRICT=false` is a
+  temporary compatibility escape hatch for a future Logseq release.
+
+Do not generalize this reliability claim to every `logseq.cli.*` alias. Prefer
+the native DB methods this service verifies and exposes, then verify every
+committed batch by reading the graph.
+
+## Queries and DB schema
+
+`query` is this MCP server's Logseq DSL query tool. Use it for supported DSL
+filters and discovery, but do not assume it exposes unrestricted Datascript.
+Raw `logseq.DB.datascriptQuery` is available through Logseq's HTTP API for
+advanced structural investigation, but is not a general MCP tool because raw
+queries cannot be safely filtered by this server's access policy.
+
+When using DB queries or interpreting DB page data, use DB schema names:
+
+| File-graph concept | DB graph equivalent |
+| --- | --- |
+| `:block/content` | `:block/title` |
+| `:block/original-name` | `:block/title` |
+| `:block/marker` | `:logseq.property/status` |
+| `:block/left` | `:block/order` |
+
+Similarly, use DB DSL forms such as `(property key)` and `(tags tag)` rather
+than file-graph forms such as `(page-property key)` and `(page-tags tag)`.
+
+`get_page_data` returns the page entity and its direct page-level blocks. Do
+not assume it contains every nested descendant. For a known nested block, use
+`get_block` with `include_children=true` -- it reads the block directly and
+does not depend on the page's direct-children list.
+
+## Minimal-diff rules
+
+- Edit one block when one claim is wrong.
+- Create a child/sibling only when the parent and desired placement are known.
+- Remove a block only when its subtree is intentionally obsolete. Deletion
+  cascades to the entire subtree with no `recursive` flag or child count in
+  the response, and `get_page_data` will not show a block's children, so
+  inspect a block with `get_block` (`include_children=true`) before deleting it.
+- `delete_page` soft-deletes (recycles) an ordinary page; it is safe to use
+  directly. Tags, properties, and today's journal delete permanently instead
+  -- that is Logseq's own recycle-bin behavior.
+- Do not rewrite a whole page to correct a sentence.
+- If a correction resolves an obsolete question or placeholder, remove or
+  replace the obsolete material in the same planned change.
+
+Avoid repeated individual single-node writes: Logseq 2.0.1 can wedge its write
+path after a small run of them, and a wedged write can make an otherwise-
+working route (e.g. `delete_block`) look permanently broken when it is really
+just stuck until a Logseq restart. A timed-out write may have committed, so
+read back before retrying.
 
 ## Text formatting rules
 
@@ -192,71 +224,72 @@ Verify significant edits with `get_page_content` or `search`.
 - Preserve the page's existing heading, list, indentation, and emphasis style.
 - Keep blocks concise and give each block one clear idea.
 - Use Markdown links and emphasis only when they match the surrounding page.
-- Use `key:: value` only for an intentional file-graph property, never as
-  decorative prose.
+- Do not insert Markdown property syntax such as `key:: value` into DB content.
 
-## File-safe tool choices
+## DB-safe tool choices
 
 | Need | Use |
 |---|---|
-| Find content | `search` |
-| Read a page/tree | `get_page_content` |
-| Read a block | `get_block` |
-| Create a page | `create_page` |
-| Modify a page | `update_page` |
-| Modify outline blocks | `update_block`, `insert_nested_block`, `delete_block` |
-| Query properties | `query`, `find_pages_by_property` |
-| Browse namespaces | `get_pages_from_namespace`, `get_pages_tree_from_namespace` |
+| Find content | `search_blocks` |
+| Read a page/tree | `get_page_data` |
+| Read a known block | `get_block` |
+| Discover pages | `list_pages` |
+| Discover classes/tags | `list_tags` |
+| Discover typed schemas | `list_properties` |
+| Batch mutation | `upsert_nodes` |
+| Typed property/tag operation | DB property/tag handlers |
 
-## Full tool inventory (file-graph mode)
+## Full tool inventory (DB mode)
 
-Every MCP tool name registered when `LOGSEQ_DB_MODE=false`, grouped by area.
+Every MCP tool name registered when `LOGSEQ_DB_MODE=true`, grouped by area.
 There is no other Logseq access available -- do not invent a tool name or
 call a raw Logseq API method directly.
 
-- **Pages**: `create_page`, `update_page`, `list_pages`, `get_page_content`,
-  `delete_page`, `rename_page`, `get_page_backlinks`,
-  `get_pages_from_namespace`, `get_pages_tree_from_namespace`.
+- **Pages**: `create_page`, `list_pages`, `get_page_data`, `get_page_content`,
+  `delete_page`, `rename_page`.
 - **Blocks**: `get_block`, `update_block`, `delete_block`, `insert_nested_block`.
-- **Search and query**: `search`, `query`, `find_pages_by_property`.
+- **Properties**: `get_property`, `upsert_property`, `remove_property`,
+  `list_properties`, `get_block_properties`, `get_block_property`,
+  `upsert_block_property`, `remove_block_property`, `set_block_properties`.
+- **Tags**: `get_tag`, `get_tag_objects`, `get_tags_by_name`, `create_tag`,
+  `list_tags`, `add_block_tag`, `remove_block_tag`, `add_tag_property`,
+  `remove_tag_property`, `add_tag_extends`, `remove_tag_extends`.
+- **Search and batch**: `search`, `search_blocks`, `upsert_nodes`.
 - **Vector (optional, only if configured)**: `vector_search`, `sync_vector_db`,
   `vector_db_status`.
 
-Not available in file-graph mode (DB-only; do not attempt): `upsert_nodes`,
-`get_page_data`, `search_blocks`, `list_tags`, `list_properties`,
-`get_property`, `upsert_property`, `remove_property`, `get_block_properties`,
-`get_block_property`, `upsert_block_property`, `remove_block_property`,
-`set_block_properties`, `get_tag`, `get_tag_objects`, `get_tags_by_name`,
-`create_tag`, `add_block_tag`, `remove_block_tag`, `add_tag_property`,
-`remove_tag_property`, `add_tag_extends`, `remove_tag_extends`. Use
-`update_page`/`update_block` plus Markdown `key:: value` properties for the
-equivalent file-graph-mode need.
+Not available in DB mode (file-graph-only; do not attempt): `update_page`,
+`query`, `find_pages_by_property`, `get_pages_from_namespace`,
+`get_pages_tree_from_namespace`, `get_page_backlinks`. Use `upsert_nodes` or
+`get_page_data` plus in-memory filtering for the equivalent DB-mode need.
 
-Do not use DB-only tools or assumptions: `get_page_data`, `search_blocks`,
-`list_tags`, `list_properties`, `upsert_nodes`, typed DB properties, DB UUID
-relationship operations, or DB class/tag modeling.
+## Failure handling
 
-## Failure handling and recovery
-
-- A timeout does not establish whether a write committed. Read the target page
-  or search for the exact changed text before retrying.
-- If a page update times out, do not repeat a `replace` operation from stale
-  content. First fetch the current page, compare it to the in-memory plan, and
-  construct only the remaining edits.
-- If Logseq's API server was restarted, start a new Claude conversation so the
-  MCP session has fresh connections.
-- On Windows, retain `PYTHONIOENCODING=utf-8` so non-ASCII Logseq content and
-  logging do not break diagnostics.
+- A first-time timeout usually indicates an unsafe argument shape. Stop and
+  compare arguments to the verified workflow before retrying, and consider
+  whether prior failed writes in the same session have wedged the write path
+  (a Logseq restart clears it) rather than assuming the route is broken.
+- `get_block(include_children=false)` is a known Logseq 2.0.1 hang. Always use
+  `true`.
+- `get_page_data` is the DB-native page reader; prefer it directly over
+  `get_page_content` for clarity, even though `get_page_content` also works
+  in DB mode now (it delegates to `get_page_data` internally).
+- If a previously successful write call begins timing out while search still
+  works, Logseq is wedged. Stop issuing write calls, verify state with
+  search, then restart Logseq, restart its HTTP API server, and start a new
+  Claude conversation.
+- A timed-out write may have committed. Search or read page data before any
+  retry, then update the in-memory plan to match the observed state.
 
 ## Response discipline
 
-Before a broad, destructive, or ambiguous change, show the user:
+Before a destructive, broad, or ambiguous change, present the plan to the user:
 
-- the page and block UUIDs affected;
-- the exact proposed Markdown or property values;
-- any links, namespaces, or properties that will change;
-- any source conflict or editorial uncertainty; and
-- the planned verification read.
+- the pages/blocks affected;
+- the exact intended replacements;
+- the properties/tags to be changed;
+- any source conflicts or uncertain interpretation; and
+- the verification step after deployment.
 
-Do not claim an edit succeeded based only on the write response. Claim success
-after the verification read shows the planned file-graph state.
+Do not claim success solely because a mutation request returned. Claim success
+only after the planned verification finds the intended DB state.
