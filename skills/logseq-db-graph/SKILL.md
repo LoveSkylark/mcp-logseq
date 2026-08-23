@@ -134,7 +134,8 @@ avoids repeated individual `Editor.*` writes.
 For an individual typed property/tag operation that cannot be represented by a
 batch, use the matching DB property/tag handler only after reading the current
 entity and schema. `update_block`, `insert_nested_block`, `upsert_block_property`,
-`remove_block_property`, `add_block_tag`, and `remove_block_tag` all work on DB
+`remove_block_property`, `add_block_tag`, `remove_block_tag`, `add_tag_extends`,
+`remove_tag_extends`, `upsert_property`, and `remove_property` all work on DB
 graphs for exactly this case -- each is a single `Editor.*`/`cli.*` write, so
 prefer `upsert_nodes` for anything batchable and reserve these for one-off edits.
 
@@ -180,8 +181,8 @@ than file-graph forms such as `(page-property key)` and `(page-tags tag)`.
 
 `get_page_data` returns the page entity and its direct page-level blocks. Do
 not assume it contains every nested descendant. For a known nested block, use
-`get_block` with `include_children=true`; a `page_name` optimization can only
-find blocks present in the page-level data.
+`get_block` with `include_children=true` -- it reads the block directly and
+does not depend on the page's direct-children list.
 
 ## Minimal-diff rules
 
