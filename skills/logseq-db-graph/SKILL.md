@@ -184,16 +184,23 @@ find blocks present in the page-level data.
 
 - Edit one block when one claim is wrong.
 - Create a child/sibling only when the parent and desired placement are known.
-- Remove a block only when its subtree is intentionally obsolete.
-- Do not delete pages through MCP. DB page deletion can flatten inbound links;
-  ask the user to delete through the Logseq UI.
+- Remove a block only when its subtree is intentionally obsolete. `delete_block`
+  has no working route on DB graphs (both `Editor.removeBlock` and
+  `cli.removeBlock` are confirmed to hang) -- the tool errors immediately
+  rather than deleting anything. If a working route is ever found, inspect
+  the block's full subtree first (`get_block` with `page_name` and
+  `include_children=true`); deletion cascades to all descendants with no
+  `recursive` flag or child count in the response.
+- `delete_page` soft-deletes (recycles) an ordinary page; it is safe to use
+  directly. Tags, properties, and today's journal delete permanently instead
+  -- that is Logseq's own recycle-bin behavior.
 - Do not rewrite a whole page to correct a sentence.
 - If a correction resolves an obsolete question or placeholder, remove or
   replace the obsolete material in the same planned change.
 
 Avoid repeated individual `Editor.*` writes: Logseq 2.0.1 can wedge after a
 small run of them. A timed-out write may have committed, so read back before
-retrying. Do not use `delete_page`; delete DB pages in the Logseq UI.
+retrying.
 
 ## Text formatting rules
 
