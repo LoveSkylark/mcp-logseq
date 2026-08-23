@@ -26,6 +26,14 @@ class TestLogSeqAPI:
 
         assert client.timeout == (5, 60)
 
+    def test_init_uses_concurrent_connection_pool(self, mock_api_key):
+        """The shared session supports concurrent MCP requests."""
+        client = LogSeq(api_key=mock_api_key)
+
+        adapter = client._session.get_adapter("http://")
+        assert adapter._pool_connections == 10
+        assert adapter._pool_maxsize == 10
+
     def test_init_with_custom_params(self, mock_api_key):
         """Test LogSeq client initialization with custom parameters."""
         client = LogSeq(
@@ -270,6 +278,42 @@ class TestLogSeqAPI:
         assert result is None
 
     @responses.activate
+    def test_db_get_page_content_uses_page_data(self, logseq_client_db):
+        """DB graphs avoid the hanging Editor.getPageBlocksTree API."""
+        responses.add(
+            responses.POST,
+            "http://127.0.0.1:12315/api",
+            json={
+                "entity": {"block/title": "Test Page", "block/uuid": "page-uuid"},
+                "blocks": [{"block/uuid": "block-uuid", "block/title": "Test block"}],
+            },
+            status=200,
+        )
+
+        result = logseq_client_db.get_page_content("Test Page")
+
+        assert result == {
+            "page": {"block/title": "Test Page", "block/uuid": "page-uuid"},
+            "blocks": [{"block/uuid": "block-uuid", "block/title": "Test block"}],
+        }
+        request_data = json.loads(responses.calls[0].request.body)
+        assert request_data == {"method": "logseq.cli.getPageData", "args": ["Test Page"]}
+
+    @responses.activate
+    def test_db_get_page_blocks_uses_page_data(self, logseq_client_db):
+        """DB block lists avoid the hanging Editor.getPageBlocksTree API."""
+        responses.add(
+            responses.POST,
+            "http://127.0.0.1:12315/api",
+            json={"entity": {"block/title": "Test Page"}, "blocks": [{"block/uuid": "block-uuid"}]},
+            status=200,
+        )
+
+        assert logseq_client_db.get_page_blocks("Test Page") == [{"block/uuid": "block-uuid"}]
+        request_data = json.loads(responses.calls[0].request.body)
+        assert request_data == {"method": "logseq.cli.getPageData", "args": ["Test Page"]}
+
+    @responses.activate
     def test_delete_page_success(self, logseq_client, mock_logseq_responses):
         """Test successful page deletion."""
         # Mock list_pages call for validation
@@ -307,6 +351,11 @@ class TestLogSeqAPI:
 
         with pytest.raises(ValueError, match="Page 'Non-existent' does not exist"):
             logseq_client.delete_page("Non-existent")
+
+    def test_db_delete_page_is_disabled(self, logseq_client_db):
+        """DB API deletion can corrupt page references and must not be attempted."""
+        with pytest.raises(ValueError, match="disabled for DB graphs"):
+            logseq_client_db.delete_page("Test Page")
 
     @responses.activate
     def test_search_content_success(self, logseq_client, mock_logseq_responses):
@@ -814,6 +863,43 @@ class TestGetBlock:
 
         request_body = json.loads(responses.calls[0].request.body)
         assert request_body["args"] == ["abc-123", {"includeChildren": False}]
+
+    @responses.activate
+    def test_get_block_forces_children_in_db_mode(self, logseq_client):
+        """DB graphs must not receive Logseq's hanging includeChildren=false call."""
+        logseq_client.db_mode = True
+        responses.add(
+            responses.POST,
+            "http://127.0.0.1:12315/api",
+            json={"uuid": "abc-123", "content": "Test block", "children": []},
+            status=200,
+        )
+
+        logseq_client.get_block("abc-123", include_children=False)
+
+        request_body = json.loads(responses.calls[0].request.body)
+        assert request_body["args"] == ["abc-123", {"includeChildren": True}]
+
+    @responses.activate
+    def test_db_get_block_from_page_data(self, logseq_client_db):
+        """Known-page DB reads bypass Editor.getBlock."""
+        responses.add(
+            responses.POST,
+            "http://127.0.0.1:12315/api",
+            json={
+                "entity": {"block/title": "Test Page"},
+                "blocks": [
+                    {"block/uuid": "parent", "block/children": [{"block/uuid": "abc-123"}]}
+                ],
+            },
+            status=200,
+        )
+
+        assert logseq_client_db.get_block_from_page_data("Test Page", "abc-123") == {
+            "block/uuid": "abc-123"
+        }
+        request_body = json.loads(responses.calls[0].request.body)
+        assert request_body == {"method": "logseq.cli.getPageData", "args": ["Test Page"]}
 
     @responses.activate
     def test_get_block_not_found(self, logseq_client):

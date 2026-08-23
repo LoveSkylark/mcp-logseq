@@ -1,9 +1,11 @@
 import asyncio
+import json
 import logging
 import sys
 from collections.abc import Sequence
 from typing import Any
 import os
+import requests
 from dotenv import load_dotenv
 from mcp.server import Server
 from mcp.types import (
@@ -14,6 +16,11 @@ from mcp.types import (
     CallToolResult,
     ListToolsResult,
 )
+
+try:
+    sys.stderr.reconfigure(errors="backslashreplace")
+except (AttributeError, OSError):
+    pass
 
 # Configure logging to stderr with more verbose output
 logging.basicConfig(
@@ -28,7 +35,7 @@ log_dir = os.path.expanduser("~/.cache/mcp-logseq")
 os.makedirs(log_dir, exist_ok=True)
 log_file = os.path.join(log_dir, "mcp_logseq.log")
 try:
-    file_handler = logging.FileHandler(log_file)
+    file_handler = logging.FileHandler(log_file, encoding="utf-8")
     file_handler.setLevel(logging.DEBUG)
     logger.addHandler(file_handler)
     logger.debug(f"Logging to: {log_file}")
@@ -69,6 +76,126 @@ _WRITE_TOOL_NAMES = frozenset(
     }
 )
 
+_DB_ONLY_TOOL_NAMES = frozenset(
+    {
+        "upsert_nodes",
+        "get_page_data",
+        "list_tags",
+        "list_properties",
+        "search_blocks",
+        "get_property",
+        "upsert_property",
+        "remove_property",
+        "get_block_properties",
+        "get_block_property",
+        "upsert_block_property",
+        "remove_block_property",
+        "get_tag",
+        "get_tag_objects",
+        "get_tags_by_name",
+        "create_tag",
+        "add_block_tag",
+        "remove_block_tag",
+        "add_tag_property",
+        "remove_tag_property",
+        "add_tag_extends",
+        "remove_tag_extends",
+        "set_block_properties",
+    }
+)
+
+_FILE_ONLY_TOOL_NAMES = frozenset(
+    {
+        "create_page",
+        "update_page",
+        "delete_page",
+        "get_page_content",
+        "search",
+        "query",
+        "find_pages_by_property",
+        "get_pages_from_namespace",
+        "get_pages_tree_from_namespace",
+        "rename_page",
+        "get_page_backlinks",
+    }
+)
+
+
+def _forced_graph_profile() -> str:
+    """Return a compact tool profile only when graph mode is explicitly forced."""
+    mode = os.getenv("LOGSEQ_DB_MODE", "auto").strip().lower()
+    if mode in {"1", "true", "yes"}:
+        return "db"
+    if mode in {"0", "false", "no"}:
+        return "file"
+    return "auto"
+
+
+def _read_tool_timeout() -> float:
+    """Return the total deadline for read tools without affecting writes."""
+    raw_value = os.getenv("MCP_READ_TOOL_TIMEOUT", "90").strip()
+    try:
+        timeout = float(raw_value)
+    except ValueError:
+        timeout = 90.0
+    return timeout if timeout > 0 else 90.0
+
+
+def _max_read_response_chars() -> int:
+    """Return the maximum read-response size, or zero to disable the guard."""
+    raw_value = os.getenv("MCP_MAX_RESPONSE_CHARS", "30000").strip()
+    try:
+        limit = int(raw_value)
+    except ValueError:
+        limit = 30000
+    return max(limit, 0)
+
+
+def _bound_read_content(name: str, content: Sequence[TextContent]) -> list[TextContent]:
+    """Keep oversized read responses useful without emitting invalid JSON."""
+    limit = _max_read_response_chars()
+    if not limit:
+        return list(content)
+
+    bounded: list[TextContent] = []
+    for item in content:
+        if len(item.text) <= limit:
+            bounded.append(item)
+            continue
+
+        try:
+            json.loads(item.text)
+        except (TypeError, ValueError):
+            text = (
+                item.text[:limit]
+                + "\n\n[Response truncated. Narrow the request or use its limit/depth options.]"
+            )
+        else:
+            text = json.dumps(
+                {
+                    "truncated": True,
+                    "tool": name,
+                    "message": "Response exceeded the configured size limit. Narrow the request or use its limit/depth options.",
+                }
+            )
+        bounded.append(TextContent(type="text", text=text))
+    return bounded
+
+
+def _transport_error_message(error: Exception) -> str:
+    """Describe common Logseq transport failures without exposing a traceback."""
+    if isinstance(error, requests.Timeout):
+        return "Logseq did not respond before the HTTP timeout. Verify its API server, then retry the read; a timed-out write may have committed."
+    if isinstance(error, requests.ConnectionError):
+        return "Unable to connect to Logseq's HTTP API. Confirm Logseq is running and its API server is started."
+    if isinstance(error, requests.HTTPError):
+        response = error.response
+        status = response.status_code if response is not None else "unknown"
+        return f"Logseq's HTTP API returned status {status}. Check the method arguments and API token."
+    if isinstance(error, (json.JSONDecodeError, requests.JSONDecodeError)):
+        return "Logseq returned an empty or invalid JSON response. Retry a read after confirming the API server is healthy."
+    return str(error)
+
 
 def _register_all_tool_handlers(handlers: dict, read_only: bool = False) -> None:
     """Populate ``handlers`` with every available ToolHandler instance.
@@ -81,15 +208,23 @@ def _register_all_tool_handlers(handlers: dict, read_only: bool = False) -> None
     ``vector_search`` and ``vector_db_status`` remain registered.
     """
 
+    profile = _forced_graph_profile()
+
     def add(tool_class: tools.ToolHandler) -> None:
         if read_only and tool_class.name in _WRITE_TOOL_NAMES:
             logger.info(f"read_only: skipping write tool handler: {tool_class.name}")
+            return
+        if profile == "db" and tool_class.name in _FILE_ONLY_TOOL_NAMES:
+            logger.info(f"db profile: skipping file-only tool handler: {tool_class.name}")
+            return
+        if profile == "file" and tool_class.name in _DB_ONLY_TOOL_NAMES:
+            logger.info(f"file profile: skipping DB-only tool handler: {tool_class.name}")
             return
         logger.debug(f"Registering tool handler: {tool_class.name}")
         handlers[tool_class.name] = tool_class
         logger.info(f"Successfully registered tool handler: {tool_class.name}")
 
-    logger.info(f"Registering tool handlers (read_only={read_only})...")
+    logger.info(f"Registering tool handlers (read_only={read_only}, profile={profile})...")
 
     add(tools.UpsertNodesToolHandler())
     add(tools.GetPageDataToolHandler())
@@ -197,13 +332,32 @@ def build_app(read_only: bool = False) -> tuple[Server, dict]:
 
         try:
             logger.debug(f"Running tool {name}")
-            result = await asyncio.to_thread(tool_handler.run_tool, arguments)
+            if name in _WRITE_TOOL_NAMES:
+                result = await asyncio.to_thread(tool_handler.run_tool, arguments)
+            else:
+                try:
+                    result = await asyncio.wait_for(
+                        asyncio.to_thread(tool_handler.run_tool, arguments),
+                        timeout=_read_tool_timeout(),
+                    )
+                except TimeoutError:
+                    return CallToolResult(
+                        content=[TextContent(
+                            type="text",
+                            text=(
+                                f"Read tool '{name}' exceeded the { _read_tool_timeout():g }s "
+                                "deadline. Check Logseq's HTTP API and retry the read."
+                            ),
+                        )],
+                        isError=True,
+                    )
+                result = _bound_read_content(name, result)
             logger.debug(f"Tool result: {result}")
             return CallToolResult(content=result)
         except Exception as e:
             logger.error(f"Error running tool: {str(e)}", exc_info=True)
             return CallToolResult(
-                content=[TextContent(type="text", text=f"Error: {str(e)}")],
+                content=[TextContent(type="text", text=f"Error: {_transport_error_message(e)}")],
                 isError=True,
             )
 

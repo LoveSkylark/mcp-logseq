@@ -37,6 +37,20 @@ Logseq which graph type is active. Set it to `true` to force the DB API adapter
 or `false` to force legacy Markdown/file behavior, where page files and the
 Markdown parser remain the source of truth.
 
+### API namespace policy
+
+The adapter keeps the API namespaces separate:
+
+| Graph mode | Read/write surface | Policy |
+| --- | --- | --- |
+| Legacy file graph | `logseq.Editor.*` | Use the Markdown/file compatibility handlers. |
+| Logseq 2.x DB graph | `logseq.cli.*` plus `logseq.app.search` | Use DB node UUIDs and the native CLI handlers only. |
+
+The verified DB CLI endpoints are `getPageData`, `listPages`, `listTags`,
+`listProperties`, and `upsertNodes`. Existing `Editor.*` property/tag wrappers
+remain compatibility code and are not considered valid DB-mode mutation paths
+until verified against the target Logseq release.
+
 The Python MCP process reuses one `requests.Session` for all calls made through
 the same configured Logseq endpoint, token, timeout, and graph mode. This is a
 process-local connection pool; separate MCP processes or different endpoint

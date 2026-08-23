@@ -1,8 +1,21 @@
-import pytest
 import asyncio
+import json
+
+import pytest
+import requests
 from unittest.mock import patch, Mock, AsyncMock
 from mcp.types import Tool, TextContent
-from mcp_logseq.server import app, tool_handlers, add_tool_handler, get_tool_handler
+from mcp_logseq.server import (
+    app,
+    tool_handlers,
+    add_tool_handler,
+    build_app,
+    get_tool_handler,
+    _bound_read_content,
+    _max_read_response_chars,
+    _read_tool_timeout,
+    _transport_error_message,
+)
 
 
 class TestMCPServerIntegration:
@@ -72,6 +85,57 @@ class TestMCPServerIntegration:
             assert hasattr(tool_desc, "name")
             assert hasattr(tool_desc, "description")
             assert hasattr(tool_desc, "input_schema")
+
+    def test_forced_db_profile_omits_file_only_tools(self, monkeypatch):
+        monkeypatch.setenv("LOGSEQ_DB_MODE", "true")
+
+        _, handlers = build_app()
+
+        assert "upsert_nodes" in handlers
+        assert "get_page_data" in handlers
+        assert "create_page" not in handlers
+        assert "get_page_content" not in handlers
+
+    def test_forced_file_profile_omits_db_only_tools(self, monkeypatch):
+        monkeypatch.setenv("LOGSEQ_DB_MODE", "false")
+
+        _, handlers = build_app()
+
+        assert "create_page" in handlers
+        assert "get_page_content" in handlers
+        assert "upsert_nodes" not in handlers
+        assert "get_page_data" not in handlers
+
+    def test_read_tool_timeout_defaults_and_validates(self, monkeypatch):
+        monkeypatch.delenv("MCP_READ_TOOL_TIMEOUT", raising=False)
+        assert _read_tool_timeout() == 90.0
+
+        monkeypatch.setenv("MCP_READ_TOOL_TIMEOUT", "12.5")
+        assert _read_tool_timeout() == 12.5
+
+        monkeypatch.setenv("MCP_READ_TOOL_TIMEOUT", "invalid")
+        assert _read_tool_timeout() == 90.0
+
+    def test_read_response_budget_truncates_text_and_preserves_json(self, monkeypatch):
+        monkeypatch.setenv("MCP_MAX_RESPONSE_CHARS", "10")
+        text = _bound_read_content("search", [TextContent(type="text", text="x" * 20)])
+        structured = _bound_read_content(
+            "search", [TextContent(type="text", text=json.dumps({"result": "x" * 20}))]
+        )
+
+        assert "Response truncated" in text[0].text
+        assert json.loads(structured[0].text)["truncated"] is True
+
+    def test_read_response_budget_defaults_and_validates(self, monkeypatch):
+        monkeypatch.delenv("MCP_MAX_RESPONSE_CHARS", raising=False)
+        assert _max_read_response_chars() == 30000
+
+        monkeypatch.setenv("MCP_MAX_RESPONSE_CHARS", "0")
+        assert _max_read_response_chars() == 0
+
+    def test_transport_error_messages(self):
+        assert "Unable to connect" in _transport_error_message(requests.ConnectionError())
+        assert "did not respond" in _transport_error_message(requests.Timeout())
 
     @patch.dict("os.environ", {"LOGSEQ_API_TOKEN": "test_token"})
     @patch("mcp_logseq.tools.logseq.LogSeq")

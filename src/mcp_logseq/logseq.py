@@ -24,13 +24,11 @@ class LogSeq:
         self.db_mode = db_mode
         self.timeout = timeout or (3, 6)
 
-        # Reuse a single HTTP connection for every call.
-        # Logseq 2.0.1 does not release per-request connections promptly; opening a
-        # new one per call exhausts the server after a handful of writes.
+        # Reuse connections while allowing concurrent MCP requests to proceed.
         self._session = requests.Session()
         adapter = requests.adapters.HTTPAdapter(
-            pool_connections=1,
-            pool_maxsize=1,
+            pool_connections=10,
+            pool_maxsize=10,
             max_retries=0,
         )
         self._session.mount("http://", adapter)
@@ -262,6 +260,15 @@ class LogSeq:
 
     def get_page_content(self, page_name: str) -> Any:
         """Get content of a LogSeq page including metadata and block content."""
+        if self.db_mode:
+            page_data = self.get_page_data(page_name)
+            if not page_data or not isinstance(page_data, dict) or page_data.get("error"):
+                return None
+            return {
+                "page": page_data.get("entity") or page_data.get("page") or {},
+                "blocks": page_data.get("blocks") or [],
+            }
+
         url = self.get_base_url()
         logger.info(f"Getting content for page '{page_name}'")
 
@@ -335,6 +342,12 @@ class LogSeq:
 
     def delete_page(self, page_name: str) -> Any:
         """Delete a LogSeq page by name."""
+        if self.db_mode:
+            raise ValueError(
+                "delete_page is disabled for DB graphs because the Logseq API can "
+                "flatten references to the deleted page. Delete the page in Logseq instead."
+            )
+
         url = self.get_base_url()
         logger.info(f"Deleting page '{page_name}'")
 
@@ -383,6 +396,12 @@ class LogSeq:
         Returns:
             List of block entities with UUIDs
         """
+        if self.db_mode:
+            page_data = self.get_page_data(page_name)
+            if not page_data or not isinstance(page_data, dict) or page_data.get("error"):
+                return []
+            return page_data.get("blocks") or []
+
         url = self.get_base_url()
         logger.info(f"Getting blocks for page '{page_name}'")
 
@@ -1215,6 +1234,12 @@ class LogSeq:
             Block dict with content, properties, uuid, children, etc.
         """
         url = self.get_base_url()
+        if self.db_mode and not include_children:
+            logger.warning(
+                "Logseq DB graphs hang on Editor.getBlock with includeChildren=false; "
+                "including children instead"
+            )
+            include_children = True
         logger.info(f"Getting block '{block_uuid}' (children={include_children})")
 
         try:
@@ -1242,6 +1267,29 @@ class LogSeq:
         except Exception as e:
             logger.error(f"Error getting block '{block_uuid}': {str(e)}")
             raise
+
+    def get_block_from_page_data(self, page_name: str, block_uuid: str) -> Any:
+        """Read a DB page and return one block from its tree by UUID."""
+        page_data = self.get_page_data(page_name)
+        if not isinstance(page_data, dict) or page_data.get("error"):
+            raise ValueError(f"Page '{page_name}' not found")
+
+        def find_block(blocks: list[Any]) -> dict | None:
+            for block in blocks:
+                if not isinstance(block, dict):
+                    continue
+                candidate_uuid = str(block.get("uuid") or block.get("block/uuid") or "")
+                if candidate_uuid == block_uuid:
+                    return block
+                child = find_block(block.get("children") or block.get("block/children") or [])
+                if child:
+                    return child
+            return None
+
+        block = find_block(page_data.get("blocks") or [])
+        if block is None:
+            raise ValueError(f"Block '{block_uuid}' not found on page '{page_name}'")
+        return block
 
     def _get_page_name_by_id(self, page_id) -> str | None:
         """Resolve a page's human-readable name from its db id (or uuid)."""

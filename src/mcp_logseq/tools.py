@@ -353,33 +353,11 @@ class CreatePageToolHandler(ToolHandler):
     def get_tool_description(self):
         return Tool(
             name=self.name,
-            description="""Create a new page in Logseq with properly structured blocks.
-
-Fails if a page with the same title already exists (use update_page to modify
-existing pages). This makes retries safe: re-sending a create_page that timed
-out will not create numbered duplicates like "Page(1)".
-
-Markdown content is automatically parsed into Logseq's block hierarchy:
-- Headings (# ## ###) create nested sections
-- Lists (- or 1.) become proper block trees  
-- Code blocks are preserved as single blocks
-- YAML frontmatter (---) becomes page properties
-
-Example content:
-```
----
-tags: [project, active]
-priority: high
----
-
-# Project Title
-Introduction paragraph.
-
-## Tasks
-- Task 1
-  - Subtask A
-- Task 2
-```""",
+                        description=(
+                                "Create a page from Markdown. Existing page names are rejected to make "
+                                "retries safe. Headings and lists become nested blocks; YAML frontmatter "
+                                "and explicit properties become page properties."
+                        ),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1054,9 +1032,13 @@ class GetBlockToolHandler(ToolHandler):
                         "type": "string",
                         "description": "UUID of the block to retrieve",
                     },
+                    "page_name": {
+                        "type": "string",
+                        "description": "Owning page name or UUID. In DB mode, this uses stable page data instead of the fragile getBlock API.",
+                    },
                     "include_children": {
                         "type": "boolean",
-                        "description": "Whether to include child blocks recursively (default: true)",
+                        "description": "Whether to include child blocks recursively (default: true). DB graphs always include children because Logseq 2.0.1 hangs when false.",
                         "default": True,
                     },
                     "format": {
@@ -1075,14 +1057,20 @@ class GetBlockToolHandler(ToolHandler):
             raise RuntimeError("block_uuid argument required")
 
         block_uuid = args["block_uuid"]
+        page_name = args.get("page_name")
         include_children = args.get("include_children", True)
         output_format = args.get("format", "text")
 
         try:
             api = _make_api()
-            _enforce_block_namespace_access(api, block_uuid)
-            _enforce_block_tag_access(api, block_uuid)
-            result = api.get_block(block_uuid, include_children=include_children)
+            if _get_db_mode() and page_name:
+                _enforce_namespace_access(page_name)
+                _enforce_page_tag_access(api, page_name)
+                result = api.get_block_from_page_data(page_name, block_uuid)
+            else:
+                _enforce_block_namespace_access(api, block_uuid)
+                _enforce_block_tag_access(api, block_uuid)
+                result = api.get_block(block_uuid, include_children=include_children)
 
             if output_format == "json":
                 return [TextContent(type="text", text=json.dumps(result, indent=2))]
@@ -1259,6 +1247,7 @@ class SearchToolHandler(ToolHandler):
         """
         parts: list[str] = []
         blocks = result.get("blocks", [])
+        truncated = False
 
         # Split into pages and content blocks
         page_results = [b for b in blocks if b.get("page?")]
@@ -1275,10 +1264,11 @@ class SearchToolHandler(ToolHandler):
             ]
             if visible_pages:
                 parts.append(f"## Matching Pages ({len(visible_pages)} found)")
-                for page in visible_pages:
+                for page in visible_pages[:limit]:
                     name = page.get("fullTitle") or page.get("title") or page.get("content", "")
                     parts.append(f"- {name}")
                 parts.append("")
+                truncated = truncated or len(visible_pages) > limit
 
         if include_blocks and block_results:
             parts.append(f"## Content Blocks ({len(block_results)} found)")
@@ -1294,14 +1284,16 @@ class SearchToolHandler(ToolHandler):
                     parts.append(f"{i + 1}. {content}")
                     parts.append(f"   uuid: {uuid}  page: {page_id}")
             parts.append("")
+            truncated = truncated or len(block_results) > limit
 
         if include_files and result.get("files"):
             parts.append(f"## Matching Files ({len(result['files'])} found)")
-            for f in result["files"]:
+            for f in result["files"][:limit]:
                 parts.append(f"- {f}")
             parts.append("")
+            truncated = truncated or len(result["files"]) > limit
 
-        if result.get("hasMore?"):
+        if result.get("hasMore?") or truncated:
             parts.append("*More results available — increase limit to see more*")
 
         total = len(blocks) + len(result.get("files", []))
@@ -1321,6 +1313,7 @@ class SearchToolHandler(ToolHandler):
         and 'files' arrays.
         """
         parts: list[str] = []
+        truncated = False
 
         if include_blocks and result.get("blocks") and not excluded_page_names:
             # Only show blocks when no exclusion is active — markdown-mode blocks
@@ -1335,6 +1328,7 @@ class SearchToolHandler(ToolHandler):
                         content = content[:150] + "..."
                     parts.append(f"{i + 1}. {content}")
             parts.append("")
+            truncated = truncated or len(blocks) > limit
 
         if include_pages and result.get("pages-content"):
             snippets = result["pages-content"]
@@ -1352,24 +1346,27 @@ class SearchToolHandler(ToolHandler):
                             snippet_text = snippet_text[:200] + "..."
                         parts.append(f"{i + 1}. {snippet_text}")
                 parts.append("")
+                truncated = truncated or len(snippets) > limit
 
         if include_pages and result.get("pages"):
             pages = result["pages"]
             visible_pages = [p for p in pages if p.lower() not in excluded_page_names]
             if visible_pages:
                 parts.append(f"## Matching Pages ({len(visible_pages)} found)")
-                for page in visible_pages:
+                for page in visible_pages[:limit]:
                     parts.append(f"- {page}")
                 parts.append("")
+                truncated = truncated or len(visible_pages) > limit
 
         if include_files and result.get("files"):
             files = result["files"]
             parts.append(f"## Matching Files ({len(files)} found)")
-            for f in files:
+            for f in files[:limit]:
                 parts.append(f"- {f}")
             parts.append("")
+            truncated = truncated or len(files) > limit
 
-        if result.get("has-more?"):
+        if result.get("has-more?") or truncated:
             parts.append("*More results available — increase limit to see more*")
 
         total = (
@@ -1399,12 +1396,13 @@ class SearchToolHandler(ToolHandler):
         if _get_db_mode():
             blocks = result.get("blocks", [])
             if include_pages:
-                out["pages"] = [
+                pages = [
                     p for p in blocks
                     if p.get("page?")
                     and (p.get("fullTitle") or p.get("title") or p.get("content", "")).lower()
                     not in excluded_page_names
                 ]
+                out["pages"] = pages[:limit]
             if include_blocks:
                 visible_blocks = SearchToolHandler._filter_db_block_results(
                     [b for b in blocks if not b.get("page?")],
@@ -1420,8 +1418,16 @@ class SearchToolHandler(ToolHandler):
                     block_results.append(block)
                 out["blocks"] = block_results
             if include_files:
-                out["files"] = result.get("files", [])
-            out["has_more"] = bool(result.get("hasMore?"))
+                files = result.get("files", [])
+                out["files"] = files[:limit]
+            out["has_more"] = bool(result.get("hasMore?")) or any(
+                len(out.get(key, [])) >= limit and len(values) > limit
+                for key, values in (
+                    ("pages", pages if include_pages else []),
+                    ("blocks", visible_blocks if include_blocks else []),
+                    ("files", files if include_files else []),
+                )
+            )
         else:
             if include_blocks and not excluded_page_names:
                 # Markdown-mode blocks carry block/content but no page
@@ -1429,18 +1435,28 @@ class SearchToolHandler(ToolHandler):
                 # them when no exclusion is active (same rule as snippets)
                 out["blocks"] = result.get("blocks", [])[:limit]
             if include_pages:
-                out["pages"] = [
+                pages = [
                     p for p in result.get("pages", [])
                     if p.lower() not in excluded_page_names
                 ]
+                out["pages"] = pages[:limit]
                 if not excluded_page_names:
                     # Snippets carry no page identifier, so they cannot be
                     # exclusion-filtered — only expose them when no exclusion
                     # is active (same rule as text mode)
                     out["pages_content"] = result.get("pages-content", [])[:limit]
             if include_files:
-                out["files"] = result.get("files", [])
-            out["has_more"] = bool(result.get("has-more?"))
+                files = result.get("files", [])
+                out["files"] = files[:limit]
+            out["has_more"] = bool(result.get("has-more?")) or any(
+                len(out.get(key, [])) >= limit and len(values) > limit
+                for key, values in (
+                    ("blocks", result.get("blocks", []) if include_blocks and not excluded_page_names else []),
+                    ("pages", pages if include_pages else []),
+                    ("pages_content", result.get("pages-content", []) if include_pages and not excluded_page_names else []),
+                    ("files", files if include_files else []),
+                )
+            )
 
         return out
 
@@ -2365,8 +2381,8 @@ class UpsertNodesToolHandler(ToolHandler):
             description=(
                 "Batch create or edit many blocks/pages in ONE call. Strongly preferred "
                 "over repeated update_block/insert_nested_block: Editor writes wedge the "
-                "server after ~7 calls, this does not. Set dry_run=true first to validate "
-                "without committing — it reports what would change."
+                "server after ~7 calls, this does not. Commits validate with a dry run by "
+                "default; set dry_run=true to validate without committing."
             ),
             inputSchema={
                 "type": "object",
@@ -2387,6 +2403,11 @@ class UpsertNodesToolHandler(ToolHandler):
                         "description": "Validate only, do not commit. Default false.",
                         "default": False,
                     },
+                    "validate_before_commit": {
+                        "type": "boolean",
+                        "description": "Run Logseq's dry-run validation before a commit. Default true.",
+                        "default": True,
+                    },
                 },
                 "required": ["operations"],
             },
@@ -2405,6 +2426,7 @@ class UpsertNodesToolHandler(ToolHandler):
 
         operations = args["operations"]
         dry_run = bool(args.get("dry_run", False))
+        validate_before_commit = bool(args.get("validate_before_commit", True))
 
         if not isinstance(operations, list) or not operations:
             return [TextContent(type="text", text="Error: operations must be a non-empty list")]
@@ -2437,8 +2459,17 @@ class UpsertNodesToolHandler(ToolHandler):
                                 raise AccessDenied(
                                     f"Access denied: cannot verify block '{target_uuid}'."
                                 )
-            result = api.upsert_nodes(operations, dry_run=dry_run)
-            label = "DRY RUN (nothing committed)" if dry_run else "COMMITTED"
+            if dry_run:
+                result = api.upsert_nodes(operations, dry_run=True)
+                label = "DRY RUN (nothing committed)"
+            else:
+                validation_result = None
+                if validate_before_commit:
+                    validation_result = api.upsert_nodes(operations, dry_run=True)
+                result = api.upsert_nodes(operations, dry_run=False)
+                label = "VALIDATED AND COMMITTED" if validation_result is not None else "COMMITTED"
+                if validation_result is not None:
+                    result = f"Validation: {validation_result}\nCommit: {result}"
             return [TextContent(
                 type="text",
                 text=f"{label} — {len(operations)} operation(s)\n{result}"

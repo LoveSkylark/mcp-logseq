@@ -1,7 +1,7 @@
 import json
 
 import pytest
-from unittest.mock import patch, Mock
+from unittest.mock import call, patch, Mock
 from mcp.types import TextContent
 from mcp_logseq.access import AccessConfig
 import mcp_logseq.tools as tools
@@ -1011,6 +1011,34 @@ class TestSearchToolHandler:
 
     @patch.dict("os.environ", {"LOGSEQ_API_TOKEN": "test_token"})
     @patch("mcp_logseq.tools.logseq.LogSeq")
+    def test_run_tool_limits_pages_and_files(self, mock_logseq_class):
+        """The documented limit bounds every included result category."""
+        mock_api = Mock()
+        mock_api.search_content.return_value = {
+            "blocks": [],
+            "pages": ["Page A", "Page B", "Page C"],
+            "pages-content": [],
+            "files": ["a.md", "b.md", "c.md"],
+            "has-more?": False,
+        }
+        mock_logseq_class.return_value = mock_api
+
+        handler = SearchToolHandler()
+        result = handler.run_tool({
+            "query": "page",
+            "limit": 2,
+            "include_blocks": False,
+            "include_files": True,
+            "format": "json",
+        })
+
+        data = json.loads(result[0].text)
+        assert data["pages"] == ["Page A", "Page B"]
+        assert data["files"] == ["a.md", "b.md"]
+        assert data["has_more"] is True
+
+    @patch.dict("os.environ", {"LOGSEQ_API_TOKEN": "test_token"})
+    @patch("mcp_logseq.tools.logseq.LogSeq")
     def test_run_tool_json_format_respects_exclusions(self, mock_logseq_class):
         """Test JSON format filters excluded pages and hides snippets."""
         mock_api = Mock()
@@ -1880,6 +1908,23 @@ class TestGetBlockToolHandler:
         mock_api.get_block.assert_called_once_with("abc-123", include_children=False)
         assert "Leaf block" in result[0].text
 
+    @patch.dict("os.environ", {"LOGSEQ_API_TOKEN": "test_token", "LOGSEQ_DB_MODE": "true"})
+    @patch("mcp_logseq.tools.logseq.LogSeq")
+    def test_db_run_tool_uses_page_data_when_page_is_supplied(self, mock_logseq_class):
+        """DB reads use page data when callers provide the owning page."""
+        mock_api = Mock()
+        mock_api.get_block_from_page_data.return_value = {
+            "uuid": "abc-123", "content": "Block content", "children": []
+        }
+        mock_logseq_class.return_value = mock_api
+
+        handler = GetBlockToolHandler()
+        result = handler.run_tool({"block_uuid": "abc-123", "page_name": "Test Page"})
+
+        mock_api.get_block_from_page_data.assert_called_once_with("Test Page", "abc-123")
+        mock_api.get_block.assert_not_called()
+        assert "Block content" in result[0].text
+
     @patch.dict("os.environ", {"LOGSEQ_API_TOKEN": "test_token"})
     def test_run_tool_missing_block_uuid(self):
         """Test that omitting block_uuid raises RuntimeError."""
@@ -1956,13 +2001,37 @@ class TestDbUpsertValidation:
     def test_accepts_page_and_block_batch(self, mock_logseq_class, _db_mode):
         from mcp_logseq.tools import UpsertNodesToolHandler
 
-        mock_logseq_class.return_value.upsert_nodes.return_value = "Added: 2."
+        operations = [
+            {"operation": "add", "entityType": "page", "id": "temp", "data": {"title": "Inbox"}},
+            {"operation": "add", "entityType": "block", "data": {"page-id": "temp", "title": "Task"}},
+        ]
+        mock_logseq_class.return_value.upsert_nodes.side_effect = ["Dry run: Added: 2.", "Added: 2."]
+        result = UpsertNodesToolHandler().run_tool({"operations": operations})
+
+        assert "VALIDATED AND COMMITTED" in result[0].text
+        mock_logseq_class.return_value.upsert_nodes.assert_has_calls([
+            call(operations, dry_run=True),
+            call(operations, dry_run=False),
+        ])
+
+    @patch.dict("os.environ", {"LOGSEQ_API_TOKEN": "test_token"})
+    @patch("mcp_logseq.tools._get_db_mode", return_value=True)
+    @patch("mcp_logseq.tools.logseq.LogSeq")
+    def test_can_commit_without_preflight(self, mock_logseq_class, _db_mode):
+        from mcp_logseq.tools import UpsertNodesToolHandler
+
+        operations = [
+            {"operation": "add", "entityType": "page", "data": {"title": "Inbox"}},
+        ]
+        mock_logseq_class.return_value.upsert_nodes.return_value = "Added: 1."
+
         result = UpsertNodesToolHandler().run_tool({
-            "operations": [
-                {"operation": "add", "entityType": "page", "id": "temp", "data": {"title": "Inbox"}},
-                {"operation": "add", "entityType": "block", "data": {"page-id": "temp", "title": "Task"}},
-            ]
+            "operations": operations,
+            "validate_before_commit": False,
         })
 
         assert "COMMITTED" in result[0].text
-        mock_logseq_class.return_value.upsert_nodes.assert_called_once()
+        assert "VALIDATED" not in result[0].text
+        mock_logseq_class.return_value.upsert_nodes.assert_called_once_with(
+            operations, dry_run=False
+        )
