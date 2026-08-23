@@ -133,26 +133,21 @@ class TestUpdatePageProperties:
         assert self._calls_for("upsertBlockProperty") == []
 
     @responses.activate
-    def test_db_mode_replace_uses_set_page_properties(self, logseq_client_db):
-        """DB graphs: replace writes only the new props via setPageProperties."""
+    def test_db_mode_replace_raises_delete_block_unavailable(self, logseq_client_db):
+        """DB graphs: replace mode clears existing blocks via delete_block, which
+        has no verified cli.* route under the hard File/DB split (no fallback)."""
         url = "http://127.0.0.1:12315/api"
         responses.add(responses.POST, url, json=[{"name": "Test Page", "originalName": "Test Page"}], status=200)  # list_pages
         responses.add(responses.POST, url, json={
             "entity": {"block/title": "Test Page"},
             "blocks": [{"block/uuid": "block-1", "block/title": "Old"}],
         }, status=200)  # clear: DB-native getPageData
-        responses.add(responses.POST, url, json=True, status=200)  # removeBlock
-        responses.add(responses.POST, url, json={"uuid": "block-2", "content": "New"}, status=200)  # appendBlockInPage
-        responses.add(responses.POST, url, json=True, status=200)  # setPageProperties
 
-        result = logseq_client_db.update_page_with_blocks(
-            "Test Page", [{"content": "New content"}],
-            properties={"priority": "high"}, mode="replace",
-        )
-
-        assert dict(result["updates"])["properties"] == {"priority": "high"}
-        assert len(self._calls_for("setPageProperties")) == 1
-        assert self._calls_for("upsertBlockProperty") == []
+        with pytest.raises(RuntimeError, match="delete_block is not available for Logseq DB graphs"):
+            logseq_client_db.update_page_with_blocks(
+                "Test Page", [{"content": "New content"}],
+                properties={"priority": "high"}, mode="replace",
+            )
 
     # ------------------------------------------------------------------ #
     # File graph mode                                                    #

@@ -16,7 +16,6 @@ class TestLogSeqAPI:
         assert manifest["list_pages"]["db_status"] == "verified"
         assert manifest["get_block"]["db_method"] == "logseq.cli.getBlock"
         assert manifest["get_block"]["db_status"] == "rejected"
-        assert manifest["get_block"]["db_fallback_method"] == "logseq.Editor.getBlock"
 
     def test_route_manifest_second_verification_pass(self, mock_api_key):
         """Live-tested 2026-08-23: a second round of cli.* candidates, verified
@@ -44,7 +43,6 @@ class TestLogSeqAPI:
         ):
             assert manifest[operation]["db_method"] == method
             assert manifest[operation]["db_status"] == "rejected"
-            assert manifest[operation]["db_fallback_method"] == manifest[operation]["file_method"]
 
     def test_db_route_uses_verified_cli_method(self, mock_api_key):
         client = LogSeq(api_key=mock_api_key, db_mode=True)
@@ -52,10 +50,16 @@ class TestLogSeqAPI:
         assert client._method_for("list_pages") == "logseq.cli.listPages"
         assert client._method_for("search") == "logseq.app.search"
 
-    def test_db_candidate_route_keeps_fallback_until_verified(self, mock_api_key):
+    def test_db_rejected_route_raises_instead_of_falling_back(self, mock_api_key):
+        """Hard File/DB split: a rejected or untested DB route raises rather
+        than silently using the Editor.* method (no cross-namespace fallback)."""
         client = LogSeq(api_key=mock_api_key, db_mode=True)
 
-        assert client._method_for("get_block") == "logseq.Editor.getBlock"
+        with pytest.raises(RuntimeError, match="get_block is not available for Logseq DB graphs"):
+            client._method_for("get_block")
+
+        with pytest.raises(RuntimeError, match="delete_block is not available for Logseq DB graphs"):
+            client._method_for("delete_block")
 
     def test_init_with_defaults(self, mock_api_key):
         """Test LogSeq client initialization with default parameters."""
@@ -948,20 +952,13 @@ class TestGetBlock:
         assert request_body["args"] == ["abc-123", {"includeChildren": False}]
 
     @responses.activate
-    def test_get_block_forces_children_in_db_mode(self, logseq_client):
-        """DB graphs must not receive Logseq's hanging includeChildren=false call."""
+    def test_get_block_unavailable_in_db_mode(self, logseq_client):
+        """get_block has no verified cli.* route, so it's unavailable on DB graphs
+        under the hard File/DB split (no cross-namespace fallback)."""
         logseq_client.db_mode = True
-        responses.add(
-            responses.POST,
-            "http://127.0.0.1:12315/api",
-            json={"uuid": "abc-123", "content": "Test block", "children": []},
-            status=200,
-        )
 
-        logseq_client.get_block("abc-123", include_children=False)
-
-        request_body = json.loads(responses.calls[0].request.body)
-        assert request_body["args"] == ["abc-123", {"includeChildren": True}]
+        with pytest.raises(RuntimeError, match="get_block is not available for Logseq DB graphs"):
+            logseq_client.get_block("abc-123", include_children=False)
 
     @responses.activate
     def test_db_get_block_from_page_data_is_limited_to_page_level_blocks(self, logseq_client_db):

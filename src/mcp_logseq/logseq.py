@@ -8,12 +8,18 @@ logger = logging.getLogger("mcp-logseq")
 
 @dataclass(frozen=True)
 class GraphOperationRoute:
-    """Method mapping for one logical MCP operation across graph models."""
+    """Method mapping for one logical MCP operation across graph models.
+
+    File graphs always use ``file_method`` (``logseq.Editor.*``). DB graphs
+    always use ``db_method`` (``logseq.cli.*``/``logseq.app.*``) when
+    ``db_status`` is "verified" — there is no cross-namespace fallback. An
+    operation whose DB route is "rejected" (confirmed unsafe, e.g. hangs) or
+    "untested" is simply unavailable on DB graphs.
+    """
 
     file_method: str | None
     db_method: str | None
     db_status: str
-    db_fallback_method: str | None = None
     notes: str = ""
 
 
@@ -36,29 +42,6 @@ GRAPH_OPERATION_ROUTES: dict[str, GraphOperationRoute] = {
     "upsert_nodes": GraphOperationRoute(
         None, "logseq.cli.upsertNodes", "verified"
     ),
-    # logseq.cli.getBlock/getBlockProperties were live-tested against
-    # Logseq 2.0.1 on 2026-08-23 and both hang indefinitely (curl timeout,
-    # HTTP 0) regardless of includeChildren, while other cli.* calls made in
-    # the same session returned normally. Rejected; retain the Editor.*
-    # fallback rather than re-testing without new evidence.
-    "get_block": GraphOperationRoute(
-        "logseq.Editor.getBlock",
-        "logseq.cli.getBlock",
-        "rejected",
-        db_fallback_method="logseq.Editor.getBlock",
-        notes="Rejected: logseq.cli.getBlock hangs (HTTP 0, 20s timeout) for both includeChildren=true and false.",
-    ),
-    "get_block_properties": GraphOperationRoute(
-        "logseq.Editor.getBlockProperties",
-        "logseq.cli.getBlockProperties",
-        "rejected",
-        db_fallback_method="logseq.Editor.getBlockProperties",
-        notes="Rejected: logseq.cli.getBlockProperties hangs (HTTP 0, 20s timeout) even with a bare block UUID argument.",
-    ),
-    # The following were live-tested against Logseq 2.0.1 on 2026-08-23 by
-    # calling each candidate directly and confirming both a real (non-null)
-    # response and that other cli.* calls made immediately before/after
-    # stayed responsive (ruling out a global wedge masking a per-call hang).
     "get_property": GraphOperationRoute(
         "logseq.Editor.getProperty", "logseq.cli.getProperty", "verified"
     ),
@@ -82,43 +65,83 @@ GRAPH_OPERATION_ROUTES: dict[str, GraphOperationRoute] = {
     "remove_tag_property": GraphOperationRoute(
         "logseq.Editor.removeTagProperty", "logseq.cli.removeTagProperty", "verified"
     ),
-    # Confirmed hangs (HTTP 0 timeout) via cli.*, independent of the get_block
-    # family above — server stayed responsive to other cli.* calls around
-    # each one, ruling out contamination from an earlier stuck call.
+    # Live-tested against Logseq 2.0.1 on 2026-08-23: each cli.* candidate
+    # below hangs indefinitely (curl timeout, HTTP 0), while other cli.*
+    # calls made immediately before/after each one stayed responsive (ruling
+    # out a global wedge masking a per-method issue). No Editor.* fallback —
+    # these operations are simply unavailable on DB graphs.
+    "get_block": GraphOperationRoute(
+        "logseq.Editor.getBlock", "logseq.cli.getBlock", "rejected",
+        notes="logseq.cli.getBlock hangs (HTTP 0) for both includeChildren=true and false.",
+    ),
+    "get_block_properties": GraphOperationRoute(
+        "logseq.Editor.getBlockProperties", "logseq.cli.getBlockProperties", "rejected",
+        notes="logseq.cli.getBlockProperties hangs (HTTP 0) even with a bare block UUID argument.",
+    ),
     "get_block_property": GraphOperationRoute(
-        "logseq.Editor.getBlockProperty",
-        "logseq.cli.getBlockProperty",
-        "rejected",
-        db_fallback_method="logseq.Editor.getBlockProperty",
-        notes="Rejected: logseq.cli.getBlockProperty hangs (HTTP 0, 8s timeout).",
+        "logseq.Editor.getBlockProperty", "logseq.cli.getBlockProperty", "rejected",
+        notes="logseq.cli.getBlockProperty hangs (HTTP 0).",
     ),
     "add_tag_extends": GraphOperationRoute(
-        "logseq.Editor.addTagExtends",
-        "logseq.cli.addTagExtends",
-        "rejected",
-        db_fallback_method="logseq.Editor.addTagExtends",
-        notes="Rejected: logseq.cli.addTagExtends hangs (HTTP 0, 8s timeout) with tag-only arguments.",
+        "logseq.Editor.addTagExtends", "logseq.cli.addTagExtends", "rejected",
+        notes="logseq.cli.addTagExtends hangs (HTTP 0) with tag-only arguments.",
     ),
     "remove_tag_extends": GraphOperationRoute(
-        "logseq.Editor.removeTagExtends",
-        "logseq.cli.removeTagExtends",
-        "rejected",
-        db_fallback_method="logseq.Editor.removeTagExtends",
-        notes="Rejected: logseq.cli.removeTagExtends hangs (HTTP 0, 8s timeout).",
+        "logseq.Editor.removeTagExtends", "logseq.cli.removeTagExtends", "rejected",
+        notes="logseq.cli.removeTagExtends hangs (HTTP 0).",
     ),
     "update_block": GraphOperationRoute(
-        "logseq.Editor.updateBlock",
-        "logseq.cli.updateBlock",
-        "rejected",
-        db_fallback_method="logseq.Editor.updateBlock",
-        notes="Rejected: logseq.cli.updateBlock hangs (HTTP 0, 8s timeout).",
+        "logseq.Editor.updateBlock", "logseq.cli.updateBlock", "rejected",
+        notes="logseq.cli.updateBlock hangs (HTTP 0).",
     ),
     "create_page": GraphOperationRoute(
-        "logseq.Editor.createPage",
-        "logseq.cli.createPage",
-        "rejected",
-        db_fallback_method="logseq.Editor.createPage",
-        notes="Rejected: logseq.cli.createPage hangs (HTTP 0, 8s timeout) even for a brand-new page.",
+        "logseq.Editor.createPage", "logseq.cli.createPage", "rejected",
+        notes="logseq.cli.createPage hangs (HTTP 0) even for a brand-new page.",
+    ),
+    "upsert_property": GraphOperationRoute(
+        "logseq.Editor.upsertProperty", "logseq.cli.upsertProperty", "rejected",
+        notes="logseq.cli.upsertProperty returns HTTP 500 'Plugins can only upsert its "
+        "own properties' for external (non-plugin) callers — Logseq's ownership model, "
+        "not fixable by namespace choice.",
+    ),
+    # Not yet live-tested against a cli.* candidate. Unavailable on DB graphs
+    # until verified — no fallback to Editor.* under the hard File/DB split.
+    "delete_block": GraphOperationRoute(
+        "logseq.Editor.removeBlock", None, "untested"
+    ),
+    "insert_block": GraphOperationRoute(
+        "logseq.Editor.insertBlock", None, "untested"
+    ),
+    "remove_property": GraphOperationRoute(
+        "logseq.Editor.removeProperty", None, "untested"
+    ),
+    "upsert_block_property": GraphOperationRoute(
+        "logseq.Editor.upsertBlockProperty", None, "untested"
+    ),
+    "remove_block_property": GraphOperationRoute(
+        "logseq.Editor.removeBlockProperty", None, "untested"
+    ),
+    "add_block_tag": GraphOperationRoute(
+        "logseq.Editor.addBlockTag", None, "untested"
+    ),
+    "remove_block_tag": GraphOperationRoute(
+        "logseq.Editor.removeBlockTag", None, "untested"
+    ),
+    "delete_page": GraphOperationRoute(
+        "logseq.Editor.deletePage", None, "untested"
+    ),
+    "rename_page": GraphOperationRoute(
+        "logseq.Editor.renamePage", None, "untested"
+    ),
+    "get_pages_from_namespace": GraphOperationRoute(
+        "logseq.Editor.getPagesFromNamespace", "logseq.cli.getPagesFromNamespace", "rejected",
+        notes="logseq.cli.getPagesFromNamespace crashes with a clean HTTP 500 "
+        "(\"Cannot read properties of undefined (reading 'apply')\") — not a hang, not viable.",
+    ),
+    "get_pages_tree_from_namespace": GraphOperationRoute(
+        "logseq.Editor.getPagesTreeFromNamespace", "logseq.cli.getPagesTreeFromNamespace", "rejected",
+        notes="logseq.cli.getPagesTreeFromNamespace crashes with a clean HTTP 500 "
+        "(\"Cannot read properties of undefined (reading 'apply')\") — not a hang, not viable.",
     ),
 }
 
@@ -165,7 +188,13 @@ class LogSeq:
         return {operation: asdict(route) for operation, route in GRAPH_OPERATION_ROUTES.items()}
 
     def _method_for(self, operation: str) -> str:
-        """Resolve the currently enabled HTTP method for a logical operation."""
+        """Resolve the HTTP method for a logical operation under a hard File/DB split.
+
+        File graphs always call ``file_method``. DB graphs always call
+        ``db_method`` when verified — never a cross-namespace fallback. An
+        operation that is "rejected" or "untested" for DB graphs raises
+        instead of silently using the Editor.* method.
+        """
         try:
             route = GRAPH_OPERATION_ROUTES[operation]
         except KeyError as error:
@@ -178,15 +207,12 @@ class LogSeq:
 
         if route.db_status == "verified" and route.db_method:
             return route.db_method
-        if route.db_fallback_method:
-            logger.warning(
-                "DB route %s is %s; using fallback %s until live verification succeeds",
-                operation,
-                route.db_status,
-                route.db_fallback_method,
-            )
-            return route.db_fallback_method
-        raise RuntimeError(f"{operation} has no enabled DB route")
+        raise RuntimeError(
+            f"{operation} is not available for Logseq DB graphs "
+            f"(db_status={route.db_status}"
+            + (f": {route.notes}" if route.notes else "")
+            + ")"
+        )
 
     def _call_api(self, method: str, args: list) -> Any:
         response = self._session.post(
@@ -364,14 +390,14 @@ class LogSeq:
         if self.db_mode:
             property_name = self.resolve_property_ident(property_name) or property_name
         return self._call_api(
-            "logseq.Editor.upsertProperty",
+            self._method_for("upsert_property"),
             [property_name, schema or {}, options or {}],
         )
 
     def remove_property(self, property_name: str) -> Any:
         if self.db_mode:
             property_name = self.resolve_property_ident(property_name) or property_name
-        return self._call_api("logseq.Editor.removeProperty", [property_name])
+        return self._call_api(self._method_for("remove_property"), [property_name])
 
     def get_block_properties(self, block_uuid: str) -> Any:
         return self._call_api(self._method_for("get_block_properties"), [block_uuid])
@@ -387,7 +413,7 @@ class LogSeq:
         if self.db_mode:
             property_name = self.resolve_property_ident(property_name) or property_name
         return self._call_api(
-            "logseq.Editor.removeBlockProperty", [block_uuid, property_name]
+            self._method_for("remove_block_property"), [block_uuid, property_name]
         )
 
     def upsert_block_property(
@@ -398,7 +424,7 @@ class LogSeq:
         if self.db_mode:
             property_name = self.resolve_property_ident(property_name) or property_name
         return self._call_api(
-            "logseq.Editor.upsertBlockProperty",
+            self._method_for("upsert_block_property"),
             [block_uuid, property_name, value, options or {}],
         )
 
@@ -435,10 +461,10 @@ class LogSeq:
         )
 
     def add_block_tag(self, block_uuid: str, tag_id: str) -> Any:
-        return self._call_api("logseq.Editor.addBlockTag", [block_uuid, tag_id])
+        return self._call_api(self._method_for("add_block_tag"), [block_uuid, tag_id])
 
     def remove_block_tag(self, block_uuid: str, tag_id: str) -> Any:
-        return self._call_api("logseq.Editor.removeBlockTag", [block_uuid, tag_id])
+        return self._call_api(self._method_for("remove_block_tag"), [block_uuid, tag_id])
 
     def get_page_content(self, page_name: str) -> Any:
         """Get content of a LogSeq page including metadata and block content."""
@@ -761,7 +787,7 @@ class LogSeq:
                 url,
                 headers=self._get_headers(),
                 json={
-                    "method": "logseq.Editor.createPage",
+                    "method": self._method_for("create_page"),
                     "args": [title, api_props, {"createFirstBlock": True}],
                 },
                 verify=self.verify_ssl,
@@ -1117,7 +1143,7 @@ class LogSeq:
                 url,
                 headers=self._get_headers(),
                 json={
-                    "method": "logseq.Editor.removeBlockProperty",
+                    "method": self._method_for("remove_block_property"),
                     "args": [block_uuid, key],
                 },
                 verify=self.verify_ssl,
@@ -1144,7 +1170,7 @@ class LogSeq:
                 url,
                 headers=self._get_headers(),
                 json={
-                    "method": "logseq.Editor.upsertBlockProperty",
+                    "method": self._method_for("upsert_block_property"),
                     "args": [block_uuid, key, value],
                 },
                 verify=self.verify_ssl,
@@ -1437,12 +1463,6 @@ class LogSeq:
             Block dict with content, properties, uuid, children, etc.
         """
         url = self.get_base_url()
-        if self.db_mode and not include_children:
-            logger.warning(
-                "Logseq DB graphs hang on Editor.getBlock with includeChildren=false; "
-                "including children instead"
-            )
-            include_children = True
         logger.info(f"Getting block '{block_uuid}' (children={include_children})")
 
         try:
@@ -1580,7 +1600,7 @@ class LogSeq:
                 url,
                 headers=self._get_headers(),
                 json={
-                    "method": "logseq.Editor.removeBlock",
+                    "method": self._method_for("delete_block"),
                     "args": [block_uuid]
                 },
                 verify=self.verify_ssl,
@@ -1605,7 +1625,7 @@ class LogSeq:
                 url,
                 headers=self._get_headers(),
                 json={
-                    "method": "logseq.Editor.updateBlock",
+                    "method": self._method_for("update_block"),
                     "args": [block_uuid, content]
                 },
                 verify=self.verify_ssl,
@@ -1716,7 +1736,7 @@ class LogSeq:
                 url,
                 headers=self._get_headers(),
                 json={
-                    "method": "logseq.Editor.renamePage",
+                    "method": self._method_for("rename_page"),
                     "args": [old_name, new_name]
                 },
                 verify=self.verify_ssl,
@@ -1780,7 +1800,7 @@ class LogSeq:
                 url,
                 headers=self._get_headers(),
                 json={
-                    "method": "logseq.Editor.insertBlock",
+                    "method": self._method_for("insert_block"),
                     "args": [parent_block_uuid, content, options]
                 },
                 verify=self.verify_ssl,
