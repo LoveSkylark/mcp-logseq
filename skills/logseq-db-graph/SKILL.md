@@ -239,6 +239,30 @@ read back before retrying.
 | Batch mutation | `upsert_nodes` |
 | Typed property/tag operation | DB property/tag handlers |
 
+## Full tool inventory (DB mode)
+
+Every MCP tool name registered when `LOGSEQ_DB_MODE=true`, grouped by area.
+There is no other Logseq access available -- do not invent a tool name or
+call a raw Logseq API method directly.
+
+- **Pages**: `create_page`, `list_pages`, `get_page_data`, `get_page_content`,
+  `delete_page`, `rename_page`.
+- **Blocks**: `get_block`, `update_block`, `delete_block`, `insert_nested_block`.
+- **Properties**: `get_property`, `upsert_property`, `remove_property`,
+  `list_properties`, `get_block_properties`, `get_block_property`,
+  `upsert_block_property`, `remove_block_property`, `set_block_properties`.
+- **Tags**: `get_tag`, `get_tag_objects`, `get_tags_by_name`, `create_tag`,
+  `list_tags`, `add_block_tag`, `remove_block_tag`, `add_tag_property`,
+  `remove_tag_property`, `add_tag_extends`, `remove_tag_extends`.
+- **Search and batch**: `search`, `search_blocks`, `upsert_nodes`.
+- **Vector (optional, only if configured)**: `vector_search`, `sync_vector_db`,
+  `vector_db_status`.
+
+Not available in DB mode (file-graph-only; do not attempt): `update_page`,
+`query`, `find_pages_by_property`, `get_pages_from_namespace`,
+`get_pages_tree_from_namespace`, `get_page_backlinks`. Use `upsert_nodes` or
+`get_page_data` plus in-memory filtering for the equivalent DB-mode need.
+
 ## Failure handling
 
 - A first-time timeout usually indicates an unsafe argument shape. Stop and
