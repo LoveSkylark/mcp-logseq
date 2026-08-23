@@ -104,7 +104,6 @@ _DB_ONLY_TOOL_NAMES = frozenset(
 
 _FILE_ONLY_TOOL_NAMES = frozenset(
     {
-        "create_page",
         "update_page",
         "query",
         "find_pages_by_property",

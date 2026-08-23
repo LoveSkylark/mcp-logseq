@@ -135,9 +135,11 @@ For an individual typed property/tag operation that cannot be represented by a
 batch, use the matching DB property/tag handler only after reading the current
 entity and schema. `update_block`, `insert_nested_block`, `upsert_block_property`,
 `remove_block_property`, `add_block_tag`, `remove_block_tag`, `add_tag_extends`,
-`remove_tag_extends`, `upsert_property`, and `remove_property` all work on DB
-graphs for exactly this case -- each is a single `Editor.*`/`cli.*` write, so
-prefer `upsert_nodes` for anything batchable and reserve these for one-off edits.
+`remove_tag_extends`, `upsert_property`, `remove_property`, and `create_page`
+all work on DB graphs for exactly this case -- each is a single `Editor.*`/
+`cli.*` write, so prefer `upsert_nodes` for anything batchable (especially a
+new page plus its blocks/tags/properties in one call) and reserve these for
+one-off edits.
 
 ### Verified batch semantics
 

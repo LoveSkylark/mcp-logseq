@@ -106,8 +106,12 @@ GRAPH_OPERATION_ROUTES: dict[str, GraphOperationRoute] = {
         "content) on a fresh Logseq restart.",
     ),
     "create_page": GraphOperationRoute(
-        "logseq.Editor.createPage", "logseq.cli.createPage", "rejected",
-        notes="logseq.cli.createPage hangs (HTTP 0) even for a brand-new page.",
+        "logseq.Editor.createPage", "logseq.cli.createPage", "verified",
+        notes="Live-tested 2026-08-23: the earlier hang was a wedged Editor.* write "
+        "session (see delete_block); on a fresh retest this succeeded instantly, "
+        "returning the new page entity and confirmed readable via get_page_data. "
+        "Editor.insertBatchBlock (used by create_page_with_blocks whenever content "
+        "is supplied) was also confirmed working on the same fresh session.",
     ),
     "upsert_property": GraphOperationRoute(
         "logseq.Editor.upsertProperty", "logseq.cli.upsertProperty", "verified",

@@ -93,10 +93,11 @@ class TestMCPServerIntegration:
 
         assert "upsert_nodes" in handlers
         assert "get_page_data" in handlers
-        assert "create_page" not in handlers
-        # get_page_content/search/delete_page/rename_page all have verified
-        # working DB-mode code paths, so they stay registered even when the
-        # DB profile is forced (only truly file-only tools are omitted).
+        assert "update_page" not in handlers
+        # get_page_content/search/delete_page/rename_page/create_page all have
+        # verified working DB-mode code paths, so they stay registered even
+        # when the DB profile is forced (only truly file-only tools are omitted).
+        assert "create_page" in handlers
         assert "get_page_content" in handlers
         assert "search" in handlers
         assert "delete_page" in handlers

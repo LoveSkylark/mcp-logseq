@@ -34,12 +34,13 @@ class TestLogSeqAPI:
             ("update_block", "logseq.cli.updateBlock"),
             ("add_tag_extends", "logseq.cli.addTagExtends"),
             ("remove_tag_extends", "logseq.cli.removeTagExtends"),
+            ("create_page", "logseq.cli.createPage"),
         ):
             assert manifest[operation]["db_method"] == method
             assert manifest[operation]["db_status"] == "verified"
 
         for operation, method in (
-            ("create_page", "logseq.cli.createPage"),
+            ("get_pages_from_namespace", "logseq.cli.getPagesFromNamespace"),
         ):
             assert manifest[operation]["db_method"] == method
             assert manifest[operation]["db_status"] == "rejected"
@@ -55,8 +56,8 @@ class TestLogSeqAPI:
         than silently using the Editor.* method (no cross-namespace fallback)."""
         client = LogSeq(api_key=mock_api_key, db_mode=True)
 
-        with pytest.raises(RuntimeError, match="create_page is not available for Logseq DB graphs"):
-            client._method_for("create_page")
+        with pytest.raises(RuntimeError, match="get_pages_from_namespace is not available for Logseq DB graphs"):
+            client._method_for("get_pages_from_namespace")
 
     def test_init_with_defaults(self, mock_api_key):
         """Test LogSeq client initialization with default parameters."""
