@@ -27,7 +27,7 @@ from mcp_logseq.vector.db import VectorDB
 from mcp_logseq.vector.embedder import create_embedder
 from mcp_logseq.vector.state import StateManager
 from mcp_logseq.vector.sync import check_staleness
-from mcp_logseq.vector.types import SearchParams, SearchResult
+from mcp_logseq.vector.types import SearchParams
 
 logger = logging.getLogger("mcp-logseq.vector.index")
 

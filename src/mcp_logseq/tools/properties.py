@@ -1,31 +1,14 @@
 """DB property tool handlers."""
 import json
-import uuid
 from mcp.types import Tool, TextContent
-from .. import access, logseq, parser
 from . import (
     AccessDenied,
     ToolHandler,
     _DBToolHandler,
-    _UUID_REF_PATTERN,
-    _collect_block_uuids,
-    _resolve_block_refs,
-    _extract_tags,
-    _is_page_excluded,
-    _namespace_matches,
-    _is_namespace_blocked,
-    _is_page_blocked,
-    _db_entity_name,
-    _db_entity_tags,
-    _enforce_db_entity_access,
-    _normalize_db_block,
-    _normalize_db_page_data,
-    _validate_upsert_operations,
     _enforce_namespace_access,
     _enforce_block_namespace_access,
     _enforce_page_tag_access,
     _enforce_block_tag_access,
-    logger,
 )
 import mcp_logseq.tools as _tools
 

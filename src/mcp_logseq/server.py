@@ -3,16 +3,12 @@ import json
 import logging
 import sys
 from collections.abc import Sequence
-from typing import Any
 import os
 import requests
 from dotenv import load_dotenv
 from mcp.server import Server
 from mcp.types import (
-    Tool,
     TextContent,
-    ImageContent,
-    EmbeddedResource,
     CallToolResult,
     ListToolsResult,
 )

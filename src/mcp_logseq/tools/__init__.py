@@ -4,10 +4,7 @@ import re
 import logging
 import threading
 import uuid
-from typing import Any
-from urllib.parse import urlparse
 from .. import logseq
-from .. import parser
 from .. import access
 from ..settings import load_settings
 from mcp.types import Tool, TextContent

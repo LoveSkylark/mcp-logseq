@@ -1,6 +1,5 @@
 """Block-level LogSeq client methods."""
 import logging
-import requests
 from typing import Any
 
 logger = logging.getLogger("mcp-logseq")
