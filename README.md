@@ -161,11 +161,13 @@ The server provides 39 verified standard tools, grouped by graph type, plus 3 op
 
 The service connects to Logseq through two primary API namespaces:
 
-1. **`logseq.Editor.*`**: page, block, property, and tag operations. This is
-  used by the legacy file-graph adapter and also exposes DB-capable individual
-  node/property operations.
+1. **`logseq.Editor.*`**: page, block, property, and tag operations for the
+  legacy file-graph adapter. File graphs use this exclusively.
 2. **`logseq.cli.*`**: Logseq 2.x DB-native page discovery, page data, and
-  batch node operations. This is the preferred connection point for DB graphs.
+  batch node operations. DB graphs use this (plus `logseq.app.*`)
+  exclusively — there is no fallback to `logseq.Editor.*`, so an operation
+  with no verified `cli.*` route is unavailable rather than silently using
+  the file-graph API. See [Tool Availability by Graph Type](#tool-availability-by-graph-type).
 
 DB search uses the companion **`logseq.app.search`** endpoint.
 
@@ -190,30 +192,39 @@ operational source of truth for safe tool selection and batching.
 ### Same Capability, Different API Namespace
 
 Several MCP capabilities exist in both deployments, but they are backed by
-different Logseq APIs. File graphs use `logseq.Editor.*`; DB graphs prefer the
-verified `logseq.cli.*` APIs and DB node operations. The MCP tool name is not
-the same thing as the Logseq API method name.
+different Logseq APIs. File graphs use `logseq.Editor.*` exclusively; DB
+graphs use `logseq.cli.*`/`logseq.app.*` exclusively. The MCP tool name is
+not the same thing as the Logseq API method name.
 
 | Capability | File graph tool and API | DB graph tool and API |
 | --- | --- | --- |
 | List pages | `list_pages` -> `logseq.Editor.getAllPages` | `list_pages` -> `logseq.cli.listPages` |
 | Read page-level blocks | `get_page_content` -> `getPage` + `getPageBlocksTree` | `get_page_data` -> `logseq.cli.getPageData` |
 | Find content | `search` -> `logseq.App.search` | `search_blocks` -> `logseq.app.search` |
-| Read a block/tree | `get_block` -> `logseq.Editor.getBlock` | `get_block` with `include_children=true`; no verified `logseq.cli.getBlock` endpoint |
+| Read a block/tree | `get_block` -> `logseq.Editor.getBlock` | `get_block` **requires `page_name`** -> reads via `logseq.cli.getPageData` (direct children only; no verified `logseq.cli.getBlock`) |
 | Create or edit nodes | page/block `Editor.*` tools | `upsert_nodes` -> `logseq.cli.upsertNodes` |
 | Read tags | page properties / `Editor.*` compatibility behavior | `list_tags` -> `logseq.cli.listTags` |
 | Read properties | Markdown properties / `Editor.*` compatibility behavior | `list_properties` -> `logseq.cli.listProperties` |
 
-When the graph is DB-based, prefer the DB column in this table. Use
-`logseq.cli.*` for the native DB MCP workflows, and use the verified DB-capable
-`logseq.Editor.*` property/tag APIs for operations that do not have a CLI
-equivalent.
+When the graph is DB-based, prefer the DB column in this table. DB graphs use
+`logseq.cli.*`/`logseq.app.*` exclusively — there is no fallback to
+`logseq.Editor.*`, so an operation with no verified `cli.*` route is simply
+unavailable rather than silently using the file-graph API. See
+[Tool Availability by Graph Type](#tool-availability-by-graph-type) below for
+exactly which ones that affects, and prefer `upsert_nodes` for DB writes.
 
 ### Tool Availability by Graph Type
 
 A tool is only registered when `LOGSEQ_DB_MODE` is forced to `true` or
 `false`; in the default `auto` mode every tool below is registered and an
-unsupported one fails at call time with an "available only for..." message.
+unsupported one fails at call time with an "available only for..." /
+"not available for Logseq DB graphs" message.
+
+DB graphs use `logseq.cli.*` exclusively — there is **no fallback** to
+`logseq.Editor.*` when a `cli.*` route hangs or errors. Several individual
+block/property/tag mutations have no verified `cli.*` equivalent yet and are
+therefore unavailable on DB graphs even though the tool is registered;
+`upsert_nodes` is the reliable DB write path for those cases.
 
 | Tool | File | DB |
 | --- | :---: | :---: |
@@ -223,30 +234,30 @@ unsupported one fails at call time with an "available only for..." message.
 | `list_properties` | | ✅ |
 | `search_blocks` | | ✅ |
 | `get_property` | | ✅ |
-| `upsert_property` | | ✅ |
-| `remove_property` | | ✅ |
-| `get_block_properties` | | ✅ |
-| `get_block_property` | | ✅ |
-| `upsert_block_property` | | ✅ |
-| `remove_block_property` | | ✅ |
+| `upsert_property` | | ❌ |
+| `remove_property` | | ❌ |
+| `get_block_properties` | | ⚠️ requires `page_name` |
+| `get_block_property` | | ⚠️ requires `page_name` |
+| `upsert_block_property` | | ❌ |
+| `remove_block_property` | | ❌ |
 | `get_tag` | | ✅ |
 | `get_tag_objects` | | ✅ |
 | `get_tags_by_name` | | ✅ |
 | `create_tag` | | ✅ |
-| `add_block_tag` | | ✅ |
-| `remove_block_tag` | | ✅ |
+| `add_block_tag` | | ❌ |
+| `remove_block_tag` | | ❌ |
 | `add_tag_property` | | ✅ |
 | `remove_tag_property` | | ✅ |
-| `add_tag_extends` | | ✅ |
-| `remove_tag_extends` | | ✅ |
+| `add_tag_extends` | | ❌ |
+| `remove_tag_extends` | | ❌ |
 | `create_page` | ✅ | |
 | `update_page` | ✅ | |
 | `list_pages` | ✅ | ✅ |
 | `get_page_content` | ✅ | |
 | `delete_page` | ✅ | |
-| `delete_block` | ✅ | ✅ |
-| `update_block` | ✅ | ✅ |
-| `get_block` | ✅ | ✅ |
+| `delete_block` | ✅ | ❌ |
+| `update_block` | ✅ | ❌ |
+| `get_block` | ✅ | ⚠️ requires `page_name` |
 | `search` | ✅ | |
 | `query` | ✅ | |
 | `find_pages_by_property` | ✅ | |
@@ -254,11 +265,20 @@ unsupported one fails at call time with an "available only for..." message.
 | `get_pages_tree_from_namespace` | ✅ | |
 | `rename_page` | ✅ | |
 | `get_page_backlinks` | ✅ | |
-| `insert_nested_block` | ✅ | ✅ |
-| `set_block_properties` | | ✅ |
+| `insert_nested_block` | ✅ | ❌ |
+| `set_block_properties` | | ❌ |
 | `vector_search` ⚗️ | ✅ | ✅ |
 | `sync_vector_db` ⚗️ | ✅ | ✅ |
 | `vector_db_status` ⚗️ | ✅ | ✅ |
+
+- **⚠️ requires `page_name`**: `get_block`/`get_block_properties`/`get_block_property`
+  have no working `cli.*` route at all; with `page_name` they read via
+  `get_page_data` instead (only sees the page's **direct** children — a
+  deeper-nested block will not be found this way).
+- **❌**: registered but currently unavailable on DB graphs — no verified
+  `cli.*` route exists yet (`_DBToolHandler`/`_method_for` raise a clear
+  "not available for Logseq DB graphs" error rather than silently using
+  `Editor.*`). Use `upsert_nodes` for DB writes where possible instead.
 
 ### Detailed Tool Guidance
 
