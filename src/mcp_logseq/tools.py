@@ -260,6 +260,10 @@ def _validate_upsert_operations(operations: list[dict]) -> None:
                 uuid.UUID(operation_id)
             except ValueError as error:
                 raise ValueError(f"operation {index} edit id must be a UUID") from error
+            # Live-tested on Logseq 2.0.1: an edit without title is rejected/
+            # unreliable, unlike add's per-entity title requirement below.
+            if not isinstance(data.get("title"), str) or not data["title"].strip():
+                raise ValueError(f"operation {index} edit requires title")
         if operation_type == "add" and entity_type == "block":
             if not isinstance(data.get("title"), str) or not data["title"].strip():
                 raise ValueError(f"operation {index} block add requires title")
@@ -491,13 +495,14 @@ class ListPagesToolHandler(ToolHandler):
                 is_journal = page.get("journal?", False)
                 if is_journal and not include_journals:
                     continue
-                # Security: pages blocked by tag OR namespace are invisible
-                name_for_check = page.get("originalName") or page.get("name", "")
+                # Security: pages blocked by tag OR namespace are invisible.
+                # DB graphs return a bare 'title' field, not 'originalName'/'name'.
+                name_for_check = page.get("title") or page.get("originalName") or page.get("name", "")
                 if _is_page_blocked(page, name_for_check):
                     continue
 
                 # Get page information
-                name = page.get("originalName") or page.get("name", "<unknown>")
+                name = page.get("title") or page.get("originalName") or page.get("name", "<unknown>")
 
                 # Build page info string
                 info_parts = [f"- {name}"]
@@ -1060,7 +1065,7 @@ class GetBlockToolHandler(ToolHandler):
                     },
                     "page_name": {
                         "type": "string",
-                        "description": "Owning page name or UUID. In DB mode, this uses stable page data instead of the fragile getBlock API.",
+                        "description": "Unused in DB mode (get_page_data-backed lookups only see top-level blocks and miss content on nested ones). Kept for file-graph compatibility only.",
                     },
                     "include_children": {
                         "type": "boolean",
@@ -1083,22 +1088,16 @@ class GetBlockToolHandler(ToolHandler):
             raise RuntimeError("block_uuid argument required")
 
         block_uuid = args["block_uuid"]
-        page_name = args.get("page_name")
         include_children = args.get("include_children", True)
         output_format = args.get("format", "text")
 
         try:
             api = _make_api()
-            if _get_db_mode() and page_name:
-                _enforce_namespace_access(page_name)
-                _enforce_page_tag_access(api, page_name)
-                result = _normalize_db_block(
-                    api.get_block_from_page_data(page_name, block_uuid)
-                )
-            else:
-                _enforce_block_namespace_access(api, block_uuid)
-                _enforce_block_tag_access(api, block_uuid)
-                result = api.get_block(block_uuid, include_children=include_children)
+            # page_name is accepted but unused: get_block_from_page_data only
+            # sees top-level blocks and misses nested content (live-tested).
+            _enforce_block_namespace_access(api, block_uuid)
+            _enforce_block_tag_access(api, block_uuid)
+            result = api.get_block(block_uuid, include_children=include_children)
 
             if output_format == "json":
                 return [TextContent(type="text", text=json.dumps(result, indent=2))]
@@ -2274,6 +2273,15 @@ class InsertNestedBlockToolHandler(ToolHandler):
         properties = args.get("properties")
         sibling = args.get("sibling", False)
 
+        if properties and _get_db_mode():
+            return [TextContent(
+                type="text",
+                text="❌ DB graphs don't support insert_nested_block's properties "
+                "argument (it's file-graph Markdown syntax and silently mints junk "
+                "properties instead of a real one). Insert the block first, then use "
+                "upsert_block_property or set_block_properties to set DB properties.",
+            )]
+
         try:
             api = _make_api()
             _enforce_block_namespace_access(api, parent_uuid)
@@ -2353,41 +2361,23 @@ class SetBlockPropertiesToolHandler(ToolHandler):
                 text="❌ set_block_properties requires LOGSEQ_DB_MODE=true (only works with Logseq DB-mode graphs)",
             )]
 
-        if "block_uuid" not in args or "properties" not in args:
-            raise RuntimeError("block_uuid and properties arguments required")
+        if "block_uuid" not in args:
+            raise RuntimeError("block_uuid argument required")
 
-        block_uuid = args["block_uuid"]
-        properties = args["properties"]
+        # Access control is enforced even though the operation itself is
+        # refused below, so a restricted block never gets a different
+        # response shape than an allowed one would.
+        api = _make_api()
+        _enforce_block_namespace_access(api, args["block_uuid"])
+        _enforce_block_tag_access(api, args["block_uuid"])
 
-        try:
-            api = _make_api()
-            _enforce_block_namespace_access(api, block_uuid)
-            _enforce_block_tag_access(api, block_uuid)
-            results = []
-
-            for prop_name, value in properties.items():
-                # Resolve display name to ident
-                ident = api.resolve_property_ident(prop_name)
-                if not ident:
-                    results.append(f"⚠️ Property '{prop_name}' not found")
-                    continue
-
-                api._upsert_block_property(block_uuid, ident, value)
-                results.append(f"✅ {prop_name} = {value}")
-
-            return [TextContent(
-                type="text",
-                text=f"Set properties on block {block_uuid}:\n" + "\n".join(results),
-            )]
-
-        except AccessDenied:
-            raise
-        except Exception as e:
-            logger.error(f"Failed to set block properties: {str(e)}")
-            return [TextContent(
-                type="text",
-                text=f"❌ Failed to set block properties: {str(e)}",
-            )]
+        return [TextContent(
+            type="text",
+            text="❌ Graph DB does not use set_block_properties (it calls the same "
+            "logseq.Editor.upsertBlockProperty confirmed to hang indefinitely on live "
+            "Logseq 2.0.1 DB graphs). Set properties at block-creation time via "
+            "upsert_nodes instead.",
+        )]
 
 
 class UpsertNodesToolHandler(ToolHandler):
@@ -2571,7 +2561,11 @@ class ListTagsToolHandler(ToolHandler):
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "expand": {"type": "boolean", "default": False},
+                    "expand": {
+                        "type": "boolean",
+                        "description": "Include idents and tag-extends metadata. Defaults to true — it's the only way to see idents/extends.",
+                        "default": True,
+                    },
                 },
             },
         )
@@ -2584,7 +2578,7 @@ class ListTagsToolHandler(ToolHandler):
                 "Set LOGSEQ_DB_MODE=true.",
             )]
         try:
-            result = _make_api().list_tags(expand=bool(args.get("expand", False)))
+            result = _make_api().list_tags(expand=bool(args.get("expand", True)))
             return [TextContent(type="text", text=json.dumps(result, indent=2))]
         except Exception as e:
             return [TextContent(type="text", text=f"Failed to list tags: {str(e)}")]
@@ -2603,7 +2597,11 @@ class ListPropertiesToolHandler(ToolHandler):
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "expand": {"type": "boolean", "default": False},
+                    "expand": {
+                        "type": "boolean",
+                        "description": "Include idents and schema metadata. Defaults to true — it's the only way to see idents.",
+                        "default": True,
+                    },
                 },
             },
         )
@@ -2616,13 +2614,18 @@ class ListPropertiesToolHandler(ToolHandler):
                 "Set LOGSEQ_DB_MODE=true.",
             )]
         try:
-            result = _make_api().list_properties(expand=bool(args.get("expand", False)))
+            result = _make_api().list_properties(expand=bool(args.get("expand", True)))
             return [TextContent(type="text", text=json.dumps(result, indent=2))]
         except Exception as e:
             return [TextContent(type="text", text=f"Failed to list properties: {str(e)}")]
 
 
 class _DBToolHandler(ToolHandler):
+    # Set on a subclass to permanently refuse a call that is confirmed (via
+    # live testing against Logseq 2.0.1) to hang rather than error, instead of
+    # letting the MCP call block for the full HTTP timeout.
+    hang_confirmed_message: str | None = None
+
     def _db_only(self) -> list[TextContent] | None:
         if not _get_db_mode():
             return [TextContent(
@@ -2636,6 +2639,9 @@ class _DBToolHandler(ToolHandler):
         blocked = self._db_only()
         if blocked:
             return blocked
+        self._access_check(_make_api(), args)
+        if self.hang_confirmed_message:
+            return [TextContent(type="text", text=self.hang_confirmed_message)]
         try:
             result = self._call(_make_api(), args)
             return [TextContent(type="text", text=json.dumps(result, indent=2))]
@@ -2643,6 +2649,10 @@ class _DBToolHandler(ToolHandler):
             raise
         except Exception as e:
             return [TextContent(type="text", text=f"{self.name} failed: {str(e)}")]
+
+    def _access_check(self, api, args: dict) -> None:
+        """Override to enforce access control before hang_confirmed_message short-circuits _call."""
+        return None
 
     def _call(self, api, args: dict):
         raise NotImplementedError
@@ -2677,7 +2687,13 @@ class GetPropertyToolHandler(_DBToolHandler):
 class UpsertPropertyToolHandler(_DBToolHandler):
     def __init__(self): super().__init__("upsert_property")
     def get_tool_description(self):
-        return Tool(name=self.name, description="Create or update a typed DB graph property.", inputSchema={
+        return Tool(name=self.name, description=(
+            "Update an EXISTING typed DB graph property (pass its full ident, e.g. "
+            "':logseq.property/status'). Do not use this to CREATE a new property from a "
+            "bare display name: Logseq mints it under a generic ':plugin.property._test_plugin/*' "
+            "ident instead (confirmed live). Use upsert_nodes with entityType='property' to "
+            "create a new property cleanly."
+        ), inputSchema={
             "type": "object", "properties": {
                 "property_name": {"type": "string"}, "schema": {"type": "object"},
                 "options": {"type": "object"},
@@ -2739,16 +2755,22 @@ class GetBlockPropertyToolHandler(_DBToolHandler):
 class UpsertBlockPropertyToolHandler(_DBToolHandler):
     def __init__(self): super().__init__("upsert_block_property")
     def get_tool_description(self):
-        return Tool(name=self.name, description="Set a typed property on a DB node.", inputSchema={
+        return Tool(name=self.name, description=(
+            "Set an EXISTING typed property on a DB node. property_name must be the property's "
+            "full ident (e.g. ':logseq.property/status'), not a bare display name — a bare name "
+            "that doesn't resolve mints a junk ':plugin.property._test_plugin/*' property instead "
+            "(confirmed live) rather than erroring."
+        ), inputSchema={
             "type": "object", "properties": {
                 "block_uuid": {"type": "string"}, "property_name": {"type": "string"},
                 "value": {}, "options": {"type": "object"},
             }, "required": ["block_uuid", "property_name", "value"],
         })
     def _call(self, api, args):
+        return api.upsert_block_property(args["block_uuid"], args["property_name"], args["value"], args.get("options"))
+    def _access_check(self, api, args):
         _enforce_block_namespace_access(api, args["block_uuid"])
         _enforce_block_tag_access(api, args["block_uuid"])
-        return api.upsert_block_property(args["block_uuid"], args["property_name"], args["value"], args.get("options"))
     def run_tool(self, args):
         for key in ("block_uuid", "property_name", "value"):
             if key not in args: raise RuntimeError(f"{key} argument required")
@@ -2764,9 +2786,10 @@ class RemoveBlockPropertyToolHandler(_DBToolHandler):
             }, "required": ["block_uuid", "property_name"],
         })
     def _call(self, api, args):
+        return api.remove_block_property(args["block_uuid"], args["property_name"])
+    def _access_check(self, api, args):
         _enforce_block_namespace_access(api, args["block_uuid"])
         _enforce_block_tag_access(api, args["block_uuid"])
-        return api._call_api("logseq.Editor.removeBlockProperty", [args["block_uuid"], args["property_name"]])
     def run_tool(self, args):
         for key in ("block_uuid", "property_name"):
             if key not in args: raise RuntimeError(f"{key} argument required")
@@ -2814,7 +2837,11 @@ class GetTagsByNameToolHandler(_DBToolHandler):
 class CreateTagToolHandler(_DBToolHandler):
     def __init__(self): super().__init__("create_tag")
     def get_tool_description(self):
-        return Tool(name=self.name, description="Create a DB graph tag/class.", inputSchema={
+        return Tool(name=self.name, description=(
+            "Create a DB graph tag/class. Prefer upsert_nodes with entityType='tag' when "
+            "batching a tag alongside pages/blocks that reference it — this per-call path is "
+            "fine standalone but is a separate write from upsert_nodes's batch."
+        ), inputSchema={
             "type": "object", "properties": {"tag_name": {"type": "string"}, "options": {"type": "object"}},
             "required": ["tag_name"],
         })
@@ -2832,9 +2859,10 @@ class AddBlockTagToolHandler(_DBToolHandler):
             "required": ["block_uuid", "tag"],
         })
     def _call(self, api, args):
+        return api.add_block_tag(args["block_uuid"], args["tag"])
+    def _access_check(self, api, args):
         _enforce_block_namespace_access(api, args["block_uuid"])
         _enforce_block_tag_access(api, args["block_uuid"])
-        return api.add_block_tag(args["block_uuid"], args["tag"])
     def run_tool(self, args):
         for key in ("block_uuid", "tag"):
             if key not in args: raise RuntimeError(f"{key} argument required")
@@ -2849,8 +2877,6 @@ class RemoveBlockTagToolHandler(AddBlockTagToolHandler):
             "required": ["block_uuid", "tag"],
         })
     def _call(self, api, args):
-        _enforce_block_namespace_access(api, args["block_uuid"])
-        _enforce_block_tag_access(api, args["block_uuid"])
         return api.remove_block_tag(args["block_uuid"], args["tag"])
 
 

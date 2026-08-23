@@ -85,6 +85,22 @@ operation at a time.
   UUID argument and no options object. `get_block_properties` stays routed to
   `logseq.Editor.getBlockProperties`.
 
+### Known DB property/tag pitfalls (live-tested)
+
+- `resolve_property_ident` (used by `get_property`, `get_block_property`,
+  `upsert_block_property`, `set_block_properties`) resolves a display name to
+  its full ident with a single joined datascript query
+  (`[:find ?ident ?title :where [?id :db/ident ?ident] [?id :block/title ?title]]`).
+  An earlier N+1 version (one query per candidate entity) was slow enough on a
+  real graph to fail to resolve built-ins such as "Description".
+- A bare property/tag name passed to `logseq.Editor.upsertProperty`,
+  `logseq.Editor.upsertBlockProperty`, or `logseq.Editor.createTag` that does
+  not resolve to an existing ident mints a junk entity under a hardcoded
+  `:plugin.property._test_plugin/*` / `:plugin.class._test_plugin/*` identity
+  instead of erroring (confirmed live). Always pass a full ident (e.g.
+  `:logseq.property/status`) to update an existing property/node; use
+  `upsert_nodes` to create a new property/tag cleanly.
+
 The Python MCP process reuses one `requests.Session` for all calls made through
 the same configured Logseq endpoint, token, timeout, and graph mode. This is a
 process-local connection pool; separate MCP processes or different endpoint

@@ -209,6 +209,57 @@ When the graph is DB-based, prefer the DB column in this table. Use
 `logseq.Editor.*` property/tag APIs for operations that do not have a CLI
 equivalent.
 
+### Tool Availability by Graph Type
+
+A tool is only registered when `LOGSEQ_DB_MODE` is forced to `true` or
+`false`; in the default `auto` mode every tool below is registered and an
+unsupported one fails at call time with an "available only for..." message.
+
+| Tool | File | DB |
+| --- | :---: | :---: |
+| `upsert_nodes` | | ✅ |
+| `get_page_data` | | ✅ |
+| `list_tags` | | ✅ |
+| `list_properties` | | ✅ |
+| `search_blocks` | | ✅ |
+| `get_property` | | ✅ |
+| `upsert_property` | | ✅ |
+| `remove_property` | | ✅ |
+| `get_block_properties` | | ✅ |
+| `get_block_property` | | ✅ |
+| `upsert_block_property` | | ✅ |
+| `remove_block_property` | | ✅ |
+| `get_tag` | | ✅ |
+| `get_tag_objects` | | ✅ |
+| `get_tags_by_name` | | ✅ |
+| `create_tag` | | ✅ |
+| `add_block_tag` | | ✅ |
+| `remove_block_tag` | | ✅ |
+| `add_tag_property` | | ✅ |
+| `remove_tag_property` | | ✅ |
+| `add_tag_extends` | | ✅ |
+| `remove_tag_extends` | | ✅ |
+| `create_page` | ✅ | |
+| `update_page` | ✅ | |
+| `list_pages` | ✅ | ✅ |
+| `get_page_content` | ✅ | |
+| `delete_page` | ✅ | |
+| `delete_block` | ✅ | ✅ |
+| `update_block` | ✅ | ✅ |
+| `get_block` | ✅ | ✅ |
+| `search` | ✅ | |
+| `query` | ✅ | |
+| `find_pages_by_property` | ✅ | |
+| `get_pages_from_namespace` | ✅ | |
+| `get_pages_tree_from_namespace` | ✅ | |
+| `rename_page` | ✅ | |
+| `get_page_backlinks` | ✅ | |
+| `insert_nested_block` | ✅ | ✅ |
+| `set_block_properties` | | ✅ |
+| `vector_search` ⚗️ | ✅ | ✅ |
+| `sync_vector_db` ⚗️ | ✅ | ✅ |
+| `vector_db_status` ⚗️ | ✅ | ✅ |
+
 ### Detailed Tool Guidance
 
 The two skills are the authoritative tool and workflow guides:

@@ -289,30 +289,49 @@ class LogSeq:
             raise
 
     def get_property(self, property_name: str) -> Any:
+        if self.db_mode:
+            property_name = self.resolve_property_ident(property_name) or property_name
         return self._call_api("logseq.Editor.getProperty", [property_name])
 
     def upsert_property(
         self, property_name: str, schema: dict | None = None, options: dict | None = None
     ) -> Any:
+        if self.db_mode:
+            property_name = self.resolve_property_ident(property_name) or property_name
         return self._call_api(
             "logseq.Editor.upsertProperty",
             [property_name, schema or {}, options or {}],
         )
 
     def remove_property(self, property_name: str) -> Any:
+        if self.db_mode:
+            property_name = self.resolve_property_ident(property_name) or property_name
         return self._call_api("logseq.Editor.removeProperty", [property_name])
 
     def get_block_properties(self, block_uuid: str) -> Any:
         return self._call_api(self._method_for("get_block_properties"), [block_uuid])
 
     def get_block_property(self, block_uuid: str, property_name: str) -> Any:
+        if self.db_mode:
+            property_name = self.resolve_property_ident(property_name) or property_name
         return self._call_api(
             "logseq.Editor.getBlockProperty", [block_uuid, property_name]
+        )
+
+    def remove_block_property(self, block_uuid: str, property_name: str) -> Any:
+        if self.db_mode:
+            property_name = self.resolve_property_ident(property_name) or property_name
+        return self._call_api(
+            "logseq.Editor.removeBlockProperty", [block_uuid, property_name]
         )
 
     def upsert_block_property(
         self, block_uuid: str, property_name: str, value: Any, options: dict | None = None
     ) -> Any:
+        # A bare display name mints a junk :plugin.property.*/<name> ident
+        # instead of resolving to the real property (live-tested on 2.0.1).
+        if self.db_mode:
+            property_name = self.resolve_property_ident(property_name) or property_name
         return self._call_api(
             "logseq.Editor.upsertBlockProperty",
             [block_uuid, property_name, value, options or {}],
@@ -1312,9 +1331,6 @@ class LogSeq:
     def resolve_property_ident(self, property_name: str) -> str | None:
         """Look up a DB property ident for a display name or return a full ident.
 
-        Uses a two-step approach since DB-mode datascript queries cannot filter
-        on string attributes directly.
-
         Args:
             property_name: The human-readable property name (e.g. "Content status")
 
@@ -1329,14 +1345,20 @@ class LogSeq:
             ":logseq.property/",
             ":plugin.property.",
         )
-        # Get all user property entities
-        query = '[:find ?id ?ident :where [?id :db/ident ?ident]]'
+        # Single joined query for (ident, title) pairs — the previous version
+        # queried idents then resolved each entity's title in a SEPARATE
+        # round trip (N+1), which is slow enough on a real graph (hundreds of
+        # :db/ident entities) to fail to resolve built-ins like "Description".
+        query = '[:find ?ident ?title :where [?id :db/ident ?ident] [?id :block/title ?title]]'
         result = self.datascript_query(query)
-        for entity_id, ident in result:
-            if isinstance(ident, str) and ident.startswith(property_ident_prefixes):
-                title = self._resolve_entity_title(entity_id)
-                if title and title.lower() == property_name.lower():
-                    return ident
+        for ident, title in result:
+            if (
+                isinstance(ident, str)
+                and isinstance(title, str)
+                and ident.startswith(property_ident_prefixes)
+                and title.lower() == property_name.lower()
+            ):
+                return ident
         return None
 
     def get_block(self, block_uuid: str, include_children: bool = True) -> Any:

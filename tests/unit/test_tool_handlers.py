@@ -1923,10 +1923,12 @@ class TestGetBlockToolHandler:
 
     @patch.dict("os.environ", {"LOGSEQ_API_TOKEN": "test_token", "LOGSEQ_DB_MODE": "true"})
     @patch("mcp_logseq.tools.logseq.LogSeq")
-    def test_db_run_tool_uses_page_data_when_page_is_supplied(self, mock_logseq_class):
-        """DB reads use page data when callers provide the owning page."""
+    def test_db_run_tool_ignores_page_name_and_uses_get_block(self, mock_logseq_class):
+        """page_name is accepted but ignored: get_block_from_page_data only sees
+        top-level blocks and misses nested content, so DB reads always use the
+        direct getBlock path (live-tested on Logseq 2.0.1)."""
         mock_api = Mock()
-        mock_api.get_block_from_page_data.return_value = {
+        mock_api.get_block.return_value = {
             "uuid": "abc-123", "content": "Block content", "children": []
         }
         mock_logseq_class.return_value = mock_api
@@ -1934,24 +1936,9 @@ class TestGetBlockToolHandler:
         handler = GetBlockToolHandler()
         result = handler.run_tool({"block_uuid": "abc-123", "page_name": "Test Page"})
 
-        mock_api.get_block_from_page_data.assert_called_once_with("Test Page", "abc-123")
-        mock_api.get_block.assert_not_called()
+        mock_api.get_block.assert_called_once_with("abc-123", include_children=True)
+        mock_api.get_block_from_page_data.assert_not_called()
         assert "Block content" in result[0].text
-
-    @patch.dict("os.environ", {"LOGSEQ_API_TOKEN": "test_token", "LOGSEQ_DB_MODE": "true"})
-    @patch("mcp_logseq.tools.logseq.LogSeq")
-    def test_db_page_data_block_with_bare_title_is_rendered(self, mock_logseq_class):
-        mock_api = Mock()
-        mock_api.get_block_from_page_data.return_value = {
-            "block/uuid": "abc-123", "title": "Bare DB block title", "children": []
-        }
-        mock_api.get_blocks_db_properties.return_value = {}
-        mock_logseq_class.return_value = mock_api
-
-        handler = GetBlockToolHandler()
-        result = handler.run_tool({"block_uuid": "abc-123", "page_name": "Test Page"})
-
-        assert "Bare DB block title" in result[0].text
 
     @patch.dict("os.environ", {"LOGSEQ_API_TOKEN": "test_token"})
     def test_run_tool_missing_block_uuid(self):

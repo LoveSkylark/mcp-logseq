@@ -50,6 +50,7 @@ param(
         "EditorUpsertBlockProperty",
         "EditorGetBlockProperties",
         "EditorRemoveBlockProperty",
+        "DestructiveSweep",
         "Direct"
     )]
     [string]$Suite = "Core",
@@ -330,8 +331,113 @@ function Invoke-EditorScenario {
     return $results
 }
 
+function Invoke-DestructiveSweep {
+    <#
+    Covers the 9 destructive DB operations left untested: delete_block,
+    remove_block_property, remove_block_tag, remove_property,
+    add_tag_property/remove_tag_property, add_tag_extends/remove_tag_extends,
+    and upsertNodes operation:"remove". Setup uses ONE batched upsertNodes
+    call (no Editor wedge risk); the destructive calls below are individual
+    Editor.* calls, which are known to wedge Logseq after ~7 in one session —
+    stop and restart Logseq if a call times out.
+    #>
+    $results = [System.Collections.ArrayList]::new()
+    $runId = [guid]::NewGuid().ToString("N").Substring(0, 12)
+    $pageTitle = "MCP Destructive Sweep $runId"
+    $tempPageId = "temp-page-$runId"
+    $tempBlockId = "temp-block-$runId"
+    $tempTagId = "temp-tag-$runId"
+    $tempParentTagId = "temp-parent-tag-$runId"
+    $tempPropertyId = "temp-property-$runId"
+
+    $operations = @(
+        @{ operation = "add"; entityType = "page"; id = $tempPageId; data = @{ title = $pageTitle } },
+        @{ operation = "add"; entityType = "block"; id = $tempBlockId; data = @{ "page-id" = $tempPageId; title = "sweep-block-$runId" } },
+        @{ operation = "add"; entityType = "tag"; id = $tempTagId; data = @{ title = "SweepTag$runId" } },
+        @{ operation = "add"; entityType = "tag"; id = $tempParentTagId; data = @{ title = "SweepParentTag$runId" } },
+        @{ operation = "add"; entityType = "property"; id = $tempPropertyId; data = @{ title = "SweepProp$runId" } }
+    )
+    $commitArguments = [System.Collections.ArrayList]::new()
+    [void]$commitArguments.Add($operations)
+    [void]$commitArguments.Add(@{ "dry-run" = $false })
+    $setup = Invoke-LogseqApi -Method "logseq.cli.upsertNodes" -Arguments $commitArguments.ToArray()
+    Add-Result -Results $results -Name "Setup: batched upsertNodes (page/block/tag/parent-tag/property)" -Response $setup
+    Assert-Success -Response $setup -Name "Setup: batched upsertNodes"
+
+    $pageData = Invoke-LogseqApi -Method "logseq.cli.getPageData" -Arguments @($pageTitle)
+    Assert-Success -Response $pageData -Name "Setup: getPageData"
+    $block = Find-Block -Blocks (Get-ObjectValue -Object $pageData.Data -Name "blocks") -Marker "sweep-block-$runId"
+    if ($null -eq $block) { throw "Setup: seeded block not found via getPageData." }
+    $blockUuid = [string](Get-ObjectValue -Object $block -Name "uuid")
+    if ([string]::IsNullOrWhiteSpace($blockUuid)) { $blockUuid = [string](Get-ObjectValue -Object $block -Name "block/uuid") }
+
+    $listTags = Invoke-LogseqApi -Method "logseq.cli.listTags" -Arguments @(@{ expand = $false })
+    Assert-Success -Response $listTags -Name "Setup: listTags"
+    $tag = @($listTags.Data) | Where-Object { $_.title -eq "SweepTag$runId" } | Select-Object -First 1
+    $parentTag = @($listTags.Data) | Where-Object { $_.title -eq "SweepParentTag$runId" } | Select-Object -First 1
+    if ($null -eq $tag -or $null -eq $parentTag) { throw "Setup: seeded tags not found via listTags." }
+    $tagUuid = [string]$tag.uuid
+    $parentTagUuid = [string]$parentTag.uuid
+
+    $listProperties = Invoke-LogseqApi -Method "logseq.cli.listProperties" -Arguments @(@{ expand = $false })
+    Assert-Success -Response $listProperties -Name "Setup: listProperties"
+    $property = @($listProperties.Data) | Where-Object { $_.title -eq "SweepProp$runId" } | Select-Object -First 1
+    if ($null -eq $property) { throw "Setup: seeded property not found via listProperties." }
+    $propertyUuid = [string]$property.uuid
+
+    Write-Host ""
+    Write-Host "Setup complete. blockUuid=$blockUuid tagUuid=$tagUuid parentTagUuid=$parentTagUuid propertyUuid=$propertyUuid"
+    Write-Host "Now running individual Editor.* destructive calls (wedge risk after ~7)."
+    Write-Host ""
+
+    # 1. add_block_tag then remove_block_tag
+    $addBlockTag = Invoke-LogseqApi -Method "logseq.Editor.addBlockTag" -Arguments @($blockUuid, $tagUuid)
+    Add-Result -Results $results -Name "addBlockTag (setup for remove_block_tag)" -Response $addBlockTag
+    $removeBlockTag = Invoke-LogseqApi -Method "logseq.Editor.removeBlockTag" -Arguments @($blockUuid, $tagUuid)
+    Add-Result -Results $results -Name "removeBlockTag" -Response $removeBlockTag
+
+    # 2. upsertBlockProperty (full ident) then remove_block_property
+    $propertyIdent = ":user.property/sweepprop$runId".ToLower()
+    $upsertBlockProp = Invoke-LogseqApi -Method "logseq.Editor.upsertBlockProperty" -Arguments @($blockUuid, $propertyIdent, "sweep-value")
+    Add-Result -Results $results -Name "upsertBlockProperty (full ident, setup for remove_block_property)" -Response $upsertBlockProp
+    $removeBlockProperty = Invoke-LogseqApi -Method "logseq.Editor.removeBlockProperty" -Arguments @($blockUuid, $propertyIdent)
+    Add-Result -Results $results -Name "removeBlockProperty" -Response $removeBlockProperty
+
+    # 3. add_tag_property then remove_tag_property
+    $addTagProperty = Invoke-LogseqApi -Method "logseq.Editor.addTagProperty" -Arguments @($tagUuid, $propertyUuid)
+    Add-Result -Results $results -Name "addTagProperty" -Response $addTagProperty
+    $removeTagProperty = Invoke-LogseqApi -Method "logseq.Editor.removeTagProperty" -Arguments @($tagUuid, $propertyUuid)
+    Add-Result -Results $results -Name "removeTagProperty" -Response $removeTagProperty
+
+    # 4. add_tag_extends then remove_tag_extends
+    $addTagExtends = Invoke-LogseqApi -Method "logseq.Editor.addTagExtends" -Arguments @($tagUuid, $parentTagUuid)
+    Add-Result -Results $results -Name "addTagExtends" -Response $addTagExtends
+    $removeTagExtends = Invoke-LogseqApi -Method "logseq.Editor.removeTagExtends" -Arguments @($tagUuid, $parentTagUuid)
+    Add-Result -Results $results -Name "removeTagExtends" -Response $removeTagExtends
+
+    # 5. remove_property (definition removal)
+    $removeProperty = Invoke-LogseqApi -Method "logseq.Editor.removeProperty" -Arguments @($propertyIdent)
+    Add-Result -Results $results -Name "removeProperty" -Response $removeProperty
+
+    # 6. delete_block
+    $deleteBlock = Invoke-LogseqApi -Method "logseq.Editor.removeBlock" -Arguments @($blockUuid)
+    Add-Result -Results $results -Name "removeBlock (delete_block)" -Response $deleteBlock
+
+    # 7. upsertNodes operation:"remove" (on the tag, since the block is gone)
+    $removeOp = @(@{ operation = "remove"; entityType = "tag"; id = $tagUuid })
+    $removeArguments = [System.Collections.ArrayList]::new()
+    [void]$removeArguments.Add($removeOp)
+    [void]$removeArguments.Add(@{ "dry-run" = $false })
+    $upsertRemove = Invoke-LogseqApi -Method "logseq.cli.upsertNodes" -Arguments $removeArguments.ToArray()
+    Add-Result -Results $results -Name "upsertNodes operation:remove (tag)" -Response $upsertRemove
+
+    return $results
+}
+
 $results = if ($Suite -eq "Core") {
     Invoke-CoreSuite
+} elseif ($Suite -eq "DestructiveSweep") {
+    Invoke-DestructiveSweep
 } else {
     Invoke-EditorScenario -State (Get-State)
 }

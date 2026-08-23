@@ -195,20 +195,14 @@ class TestResolvePropertyIdent:
     @responses.activate
     def test_found(self, logseq_client):
         """Matching property name returns its ident."""
-        # Query: get all idents
+        # Single joined query: (ident, title) pairs in one round trip.
         responses.add(
             responses.POST, "http://127.0.0.1:12315/api",
             json=[
-                [501, ":user.property/status-abc"],
-                [502, ":user.property/priority-def"],
-                [503, ":db/ident"],
+                [":user.property/status-abc", "Content status"],
+                [":user.property/priority-def", "Priority"],
+                [":db/ident", "Ident"],
             ],
-            status=200,
-        )
-        # Resolve title for entity 501
-        responses.add(
-            responses.POST, "http://127.0.0.1:12315/api",
-            json=[["title", "Content status"]],
             status=200,
         )
 
@@ -220,12 +214,7 @@ class TestResolvePropertyIdent:
         """Lookup is case-insensitive."""
         responses.add(
             responses.POST, "http://127.0.0.1:12315/api",
-            json=[[501, ":user.property/status-abc"]],
-            status=200,
-        )
-        responses.add(
-            responses.POST, "http://127.0.0.1:12315/api",
-            json=[["title", "Content status"]],
+            json=[[":user.property/status-abc", "Content status"]],
             status=200,
         )
 
@@ -237,12 +226,7 @@ class TestResolvePropertyIdent:
         """Non-existent property returns None."""
         responses.add(
             responses.POST, "http://127.0.0.1:12315/api",
-            json=[[501, ":user.property/status-abc"]],
-            status=200,
-        )
-        responses.add(
-            responses.POST, "http://127.0.0.1:12315/api",
-            json=[["title", "Status"]],
+            json=[[":user.property/status-abc", "Status"]],
             status=200,
         )
 
