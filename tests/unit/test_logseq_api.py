@@ -58,8 +58,8 @@ class TestLogSeqAPI:
         with pytest.raises(RuntimeError, match="create_page is not available for Logseq DB graphs"):
             client._method_for("create_page")
 
-        with pytest.raises(RuntimeError, match="remove_property is not available for Logseq DB graphs"):
-            client._method_for("remove_property")
+        with pytest.raises(RuntimeError, match="add_tag_extends is not available for Logseq DB graphs"):
+            client._method_for("add_tag_extends")
 
     def test_init_with_defaults(self, mock_api_key):
         """Test LogSeq client initialization with default parameters."""

@@ -105,10 +105,15 @@ GRAPH_OPERATION_ROUTES: dict[str, GraphOperationRoute] = {
         notes="logseq.cli.createPage hangs (HTTP 0) even for a brand-new page.",
     ),
     "upsert_property": GraphOperationRoute(
-        "logseq.Editor.upsertProperty", "logseq.cli.upsertProperty", "rejected",
-        notes="logseq.cli.upsertProperty returns HTTP 500 'Plugins can only upsert its "
-        "own properties' for external (non-plugin) callers — Logseq's ownership model, "
-        "not fixable by namespace choice.",
+        "logseq.Editor.upsertProperty", "logseq.cli.upsertProperty", "verified",
+        notes="Live-tested 2026-08-23: the original 'Plugins can only upsert its own "
+        "properties' HTTP 500 was a misdiagnosis -- it came from an invalid schema "
+        "arg (type must be one of :date/:number/:checkbox/:default/:string/:node/"
+        ":url/:datetime/:json/:asset, not free text). With a valid schema this "
+        "creates the property successfully, though -- like Editor.upsertProperty/"
+        "createTag -- it mints a new ':plugin.property._test_plugin/*' ident from "
+        "a bare display name rather than editing an existing differently-namespaced "
+        "property; that part is Logseq's plugin-ownership model, not a bug here.",
     ),
     # Not yet live-tested against a cli.* candidate. Unavailable on DB graphs
     # until verified — no fallback to Editor.* under the hard File/DB split.
@@ -132,11 +137,12 @@ GRAPH_OPERATION_ROUTES: dict[str, GraphOperationRoute] = {
         "returning the newly-created child block entity.",
     ),
     "remove_property": GraphOperationRoute(
-        "logseq.Editor.removeProperty", None, "rejected",
-        notes="logseq.cli.removeProperty returns HTTP 200 but is a no-op: the "
-        "property definition is unchanged afterward (confirmed via getPageData "
-        "and listProperties before/after). No working DB route to remove a "
-        "property definition.",
+        "logseq.Editor.removeProperty", "logseq.cli.removeProperty", "verified",
+        notes="Live-tested 2026-08-23: an earlier test found this a no-op (property "
+        "unchanged after the call); re-tested on a fresh property and it actually "
+        "deleted the property entity (confirmed absent from both getPageData and "
+        "listProperties afterward). The earlier no-op reading does not reproduce; "
+        "treat it as resolved rather than a real limitation.",
     ),
     "upsert_block_property": GraphOperationRoute(
         "logseq.Editor.upsertBlockProperty", "logseq.cli.upsertBlockProperty", "verified",
