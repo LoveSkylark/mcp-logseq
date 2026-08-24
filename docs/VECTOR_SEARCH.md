@@ -4,7 +4,33 @@ Semantic search over your Logseq graph using local or hosted AI embeddings. Find
 
 ## Architecture
 
-![Architecture diagram](assets/images/architecture.png)
+```mermaid
+flowchart LR
+  Clients["Claude Code / Claude Desktop / ChatGPT"]
+  MCP["MCP Server"]
+  ACL["Access control and response limits"]
+  DB["Logseq 2.x DB graph"]
+  Files["Legacy Markdown graph"]
+  API["Logseq HTTP API"]
+  DS["Internal Datascript block reader"]
+  Search["Search and DB tools"]
+  Writer["logseq-sync writer"]
+  Embed["Ollama / OpenAI / compatible provider"]
+  Lance["LanceDB vector index"]
+
+  Clients --> MCP
+  MCP --> ACL
+  ACL --> Search
+  Search --> API
+  API --> DB
+  API --> Files
+  DB --> DS
+  DS --> MCP
+  Writer --> API
+  Writer --> Embed
+  Embed --> Lance
+  MCP --> Lance
+```
 
 ## How It Works
 
