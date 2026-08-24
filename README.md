@@ -463,7 +463,7 @@ export LOGSEQ_API_URL=http://localhost:12315
 ### Test LogSeq Connection
 
 ```bash
-uv run --with mcp-logseq python -c "
+uv run --project "<REPO_DIR>" python -c "
 from mcp_logseq.logseq import LogSeq
 api = LogSeq(api_key='your_token')
 print(f'Connected! Found {len(api.list_pages())} pages')
@@ -479,7 +479,7 @@ claude mcp list  # Should show mcp-logseq
 ### Debug with MCP Inspector
 
 ```bash
-npx @modelcontextprotocol/inspector uv run --with mcp-logseq mcp-logseq
+npx @modelcontextprotocol/inspector uv run --project "<REPO_DIR>" mcp-logseq
 ```
 
 ---

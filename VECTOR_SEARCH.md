@@ -52,10 +52,10 @@ Install the optional vector dependencies. The `[vector]` extra pulls in LanceDB,
 uv pip install "mcp-logseq[vector]"
 ```
 
-**From source (development):**
+**From a local checkout (development):**
 ```bash
-cd /path/to/mcp-logseq-server
-uv pip install -e ".[vector]"
+cd "<REPO_DIR>"
+uv sync --extra vector
 ```
 
 ---
@@ -136,18 +136,17 @@ This keeps everything in one place:
 
 ### Logseq 2.x DB graphs
 
-Set `LOGSEQ_DB_MODE=auto` to detect the active graph, or `true` when the graph
-is a Logseq 2.x DB graph. The sync
-writer then uses Logseq's DB API (`logseq.cli.listPages` and
-`logseq.cli.getPageData`) instead of looking for Markdown files. The Logseq
-desktop application must be running with its HTTP API enabled, and
-`LOGSEQ_API_TOKEN` must be available to the sync process.
+Set `LOGSEQ_DB_MODE=true` for a Logseq 2.x DB graph or `false` for a legacy
+Markdown/file graph. Use an explicit value for dedicated deployments. The
+sync writer uses the DB API for DB graphs and local graph files for file
+graphs. DB-mode sync requires Logseq to be running with its HTTP API enabled,
+and `LOGSEQ_API_TOKEN` must be available to the sync process.
 
 DB graph state is tracked by page UUID. After changing index filters or
 switching between file and DB mode, run a full rebuild:
 
 ```bash
-LOGSEQ_DB_MODE=auto logseq-sync --rebuild
+LOGSEQ_DB_MODE=true logseq-sync --rebuild
 ```
 
 | Field | Required | Description |
@@ -164,7 +163,7 @@ LOGSEQ_DB_MODE=auto logseq-sync --rebuild
 | `vector.include_journals` | no | Index journal pages (default: `true`) |
 | `vector.exclude_tags` | no | Additional tags to skip from the vector index only (additive with top-level `exclude_tags`). Use for noise filtering - e.g. large reference dumps that pollute semantic search but are fine to read directly. (default: `[]`) |
 | `vector.min_chunk_length` | no | Minimum characters per chunk (default: `50`) |
-| `LOGSEQ_DB_MODE` | no | Defaults to `auto`; set to `true` for Logseq 2.x DB graphs or `false` for legacy Markdown/file graphs |
+| `LOGSEQ_DB_MODE` | no | Set to `true` for Logseq 2.x DB graphs or `false` for legacy Markdown/file graphs. `auto` is legacy compatibility mode only. |
 
 **Important:** keep `db_path` outside your iCloud-synced Logseq folder. The DB is a generated binary artifact - syncing it to iCloud wastes bandwidth and can cause corruption.
 
@@ -175,41 +174,14 @@ your user account, for example with `chmod 600 ~/.logseq-vector/config.json`.
 
 ## MCP Server Setup
 
-Point the MCP server at your config file via the `LOGSEQ_CONFIG_FILE` environment variable.
+Point the MCP server at your config file via the `LOGSEQ_CONFIG_FILE`
+environment variable. Use [INSTALLATION.md](INSTALLATION.md) for current
+Claude Code, Claude Desktop, and ChatGPT deployment instructions. Set
+`LOGSEQ_DB_MODE=true` for a DB graph or `false` for a legacy file graph.
 
-### Claude Code
-
-```bash
-claude mcp add-json mcp-logseq '{
-  "command": "uv",
-  "args": ["run", "--with", ".[vector]", "python", "-c", "from mcp_logseq import main; main()"],
-  "cwd": "/path/to/mcp-logseq-server",
-  "env": {
-    "LOGSEQ_API_TOKEN": "your_token",
-    "LOGSEQ_API_URL": "http://localhost:12315",
-    "LOGSEQ_CONFIG_FILE": "/Users/you/.logseq-vector/config.json"
-  }
-}' -s local
-```
-
-### Claude Desktop
-
-```json
-{
-  "mcpServers": {
-    "mcp-logseq": {
-      "command": "uv",
-      "args": ["run", "--with", ".[vector]", "python", "-c", "from mcp_logseq import main; main()"],
-      "cwd": "/path/to/mcp-logseq-server",
-      "env": {
-        "LOGSEQ_API_TOKEN": "your_token",
-        "LOGSEQ_API_URL": "http://localhost:12315",
-        "LOGSEQ_CONFIG_FILE": "/Users/you/.logseq-vector/config.json"
-      }
-    }
-  }
-}
-```
+For a local checkout, install the vector extra with `uv sync --extra vector`
+and launch the executable from that checkout. Do not use a generic cached
+`uv --with mcp-logseq` command when verifying which code is running.
 
 If `LOGSEQ_CONFIG_FILE` is not set or `vector.enabled` is `false`, the vector tools are silently not registered. All other tools work normally.
 
@@ -221,13 +193,13 @@ Before using `vector_search`, you need to build the initial index. This can take
 
 ```bash
 export LOGSEQ_CONFIG_FILE=~/.logseq-vector/config.json
-uv run --with ".[vector]" python -m mcp_logseq.bin.logseq_sync --once
+uv run --project "<REPO_DIR>" logseq-sync --once
 ```
 
 You'll see progress as batches of pages are embedded. Check status when done:
 
 ```bash
-uv run --with ".[vector]" python -m mcp_logseq.bin.logseq_sync --status
+uv run --project "<REPO_DIR>" logseq-sync --status
 ```
 
 ---
@@ -303,10 +275,10 @@ For syncing outside of the MCP server - useful for initial indexing, automation,
 ```bash
 export LOGSEQ_CONFIG_FILE=~/.logseq-vector/config.json
 
-uv run --with ".[vector]" python -m mcp_logseq.bin.logseq_sync --once     # incremental sync and exit
-uv run --with ".[vector]" python -m mcp_logseq.bin.logseq_sync --watch    # sync on file changes (runs until Ctrl+C)
-uv run --with ".[vector]" python -m mcp_logseq.bin.logseq_sync --rebuild  # drop DB and re-index from scratch
-uv run --with ".[vector]" python -m mcp_logseq.bin.logseq_sync --status   # staleness report, no sync
+uv run --project "<REPO_DIR>" logseq-sync --once     # incremental sync and exit
+uv run --project "<REPO_DIR>" logseq-sync --watch    # watch and sync changes
+uv run --project "<REPO_DIR>" logseq-sync --rebuild  # drop DB and re-index
+uv run --project "<REPO_DIR>" logseq-sync --status   # staleness report
 ```
 
 For continuous sync without the MCP auto-trigger, `--watch` is the recommended approach. It debounces file system events and re-embeds only changed files.
