@@ -7,44 +7,46 @@ logger = logging.getLogger("mcp-logseq")
 class BlockMixin:
     def _get_db_block_tree(self, block_uuid: str) -> dict:
         """Read a DB block tree through Datascript, without cli.getBlock."""
-        uuid_rows = self.datascript_query(
-            '[:find ?id ?uuid :where [?id :block/uuid ?uuid]]'
+        rows = self.datascript_query(
+            '[:find ?id ?a ?v :where [?id :block/uuid ?uuid] [?id ?a ?v]]'
         )
+        entities: dict[int, dict] = {}
+        for row in rows:
+            if len(row) < 3:
+                continue
+            entity_id, attribute, value = int(row[0]), str(row[1]), row[2]
+            key = attribute.lstrip(":").split("/")[-1]
+            if isinstance(value, dict) and "id" in value:
+                value = value["id"]
+            entities.setdefault(entity_id, {"id": entity_id})[key] = value
+
         block_id = next(
-            (row[0] for row in uuid_rows if len(row) >= 2 and str(row[1]) == block_uuid),
+            (entity_id for entity_id, entity in entities.items()
+             if str(entity.get("uuid", "")) == block_uuid),
             None,
         )
         if block_id is None:
             raise ValueError(f"Block '{block_uuid}' not found")
 
-        def load_node(entity_id: int, uuid: str | None = None) -> dict:
-            rows = self.datascript_query(
-                f'[:find ?a ?v :where [{int(entity_id)} ?a ?v]]'
-            )
-            node: dict = {"id": entity_id}
-            for row in rows:
-                if len(row) < 2:
-                    continue
-                attribute, value = str(row[0]), row[1]
-                key = attribute.lstrip(":").split("/")[-1]
-                if key in {"uuid", "title", "content", "parent", "page", "order", "level"}:
-                    if isinstance(value, dict) and "id" in value:
-                        value = value["id"]
-                    node[key] = value
-            node["uuid"] = str(node.get("uuid") or uuid or "")
+        children_by_parent: dict[int, list[int]] = {}
+        for entity_id, entity in entities.items():
+            parent = entity.get("parent")
+            if isinstance(parent, int):
+                children_by_parent.setdefault(parent, []).append(entity_id)
+
+        def load_node(entity_id: int, active: frozenset[int] = frozenset()) -> dict:
+            if entity_id in active:
+                return {"id": entity_id, "uuid": str(entities[entity_id].get("uuid", "")), "children": []}
+            node = dict(entities[entity_id])
+            node["uuid"] = str(node.get("uuid", ""))
             node["content"] = str(node.get("title") or node.get("content") or "")
-            child_rows = self.datascript_query(
-                f'[:find ?child ?uuid :where [?child :block/parent {int(entity_id)}] '
-                f'[?child :block/uuid ?uuid]]'
-            )
             node["children"] = [
-                load_node(int(row[0]), str(row[1]))
-                for row in child_rows
-                if len(row) >= 2
+                load_node(child_id, active | {entity_id})
+                for child_id in children_by_parent.get(entity_id, [])
             ]
             return node
 
-        return load_node(int(block_id), block_uuid)
+        return load_node(int(block_id))
 
     def remove_block(self, block_uuid: str) -> None:
         """

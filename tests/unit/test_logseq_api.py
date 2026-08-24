@@ -1079,26 +1079,15 @@ class TestGetBlock:
         """DB getBlock uses Datascript instead of the hanging native route."""
         logseq_client.db_mode = True
 
-        responses.add(
-            responses.POST,
-            "http://127.0.0.1:12315/api",
-            json=[[2832, "block-uuid"]], status=200,
-        )
-        responses.add(
-            responses.POST,
-            "http://127.0.0.1:12315/api",
-            json=[["block/title", "Parent"]], status=200,
-        )
-        responses.add(
-            responses.POST,
-            "http://127.0.0.1:12315/api",
-            json=[], status=200,
-        )
+        responses.add(responses.POST, "http://127.0.0.1:12315/api", json=[
+            [2832, "block/uuid", "block-uuid"],
+            [2832, "block/title", "Parent"],
+        ], status=200)
 
         result = logseq_client.get_block("block-uuid", include_children=True)
 
         assert result["content"] == "Parent"
-        assert len(responses.calls) == 3
+        assert len(responses.calls) == 1
         for call in responses.calls:
             assert json.loads(call.request.body)["method"] == "logseq.DB.datascriptQuery"
 
@@ -1106,17 +1095,20 @@ class TestGetBlock:
     def test_db_mode_get_block_builds_nested_tree_with_datascript(self, logseq_client):
         logseq_client.db_mode = True
         api_url = "http://127.0.0.1:12315/api"
-        responses.add(responses.POST, api_url, json=[[1, "root-uuid"]], status=200)
-        responses.add(responses.POST, api_url, json=[["block/title", "Parent"]], status=200)
-        responses.add(responses.POST, api_url, json=[[2, "child-uuid"]], status=200)
-        responses.add(responses.POST, api_url, json=[["block/title", "Child"]], status=200)
-        responses.add(responses.POST, api_url, json=[], status=200)
+        responses.add(responses.POST, api_url, json=[
+            [1, "block/uuid", "root-uuid"],
+            [1, "block/title", "Parent"],
+            [2, "block/uuid", "child-uuid"],
+            [2, "block/title", "Child"],
+            [2, "block/parent", 1],
+        ], status=200)
 
         result = logseq_client.get_block("root-uuid")
 
         assert result["content"] == "Parent"
         assert result["children"][0]["uuid"] == "child-uuid"
         assert result["children"][0]["content"] == "Child"
+        assert len(responses.calls) == 1
         assert all(
             json.loads(call.request.body)["method"] == "logseq.DB.datascriptQuery"
             for call in responses.calls
