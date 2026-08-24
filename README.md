@@ -57,48 +57,6 @@ server enables Claude to read, organize, and safely update your LogSeq graphs.
 - **Optional semantic search**: find related notes by meaning with local or
   hosted embedding providers.
 
-###  Real-World Examples
-
-####  Intelligent Knowledge Management
-
-```text
-"Analyze all my project notes from the past month and create a status summary"
-"Find pages mentioning 'machine learning' and create a study roadmap"
-"Search for incomplete tasks across all my pages"
-```
-
-####  Automated Content Creation
-
-```text
-"Create a new page called 'Today's Standup' with my meeting notes"
-"Add today's progress update to my existing project timeline page"
-"Create a weekly review page from my recent notes"
-```
-
-####  Smart Research & Analysis
-
-```text
-"Compare my notes on React vs Vue and highlight key differences"
-"Find all references to 'customer feedback' and summarize themes"
-"Create a knowledge map connecting related topics across pages"
-```
-
-####  Semantic Search *(optional, requires vector setup)*
-
-```text
-"Find everything I wrote about burnout, even if I didn't use that word"
-"What notes relate to my thoughts on deep work?"
-"Search across my Dutch and English notes for ideas about productivity"
-```
-
-####  Meeting & Documentation Workflow
-
-```text
-"Read my meeting notes and create individual task pages for each action item"
-"Get my journal entries from this week and create a summary page"
-"Search for 'Q4 planning' and organize all related content into a new overview page"
-```
-
 ###  Key Benefits
 
 - **Zero Context Switching**: Claude works directly with your LogSeq data.
