@@ -101,7 +101,20 @@ server enables Claude to read, organize, and safely update your LogSeq graphs.
 2. Click the **API button (🔌)** in LogSeq → **"Start server"**
 3. **Generate API token**: API panel → "Authorization tokens" → Create new
 
-### Step 2: Add to Claude (No Installation Required!)
+### Step 2: Install the Local MCP Server
+
+From PowerShell, install this checkout into its local virtual environment:
+
+```powershell
+Set-Location E:\git\mcp-logseq
+uv sync --extra vector
+```
+
+This creates `E:\git\mcp-logseq\.venv\Scripts\mcp-logseq.exe`. Claude
+Desktop should launch that executable directly so it cannot resolve a stale
+PyPI package, Git branch, or unrelated cached environment.
+
+### Step 3: Add to Claude
 
 #### Claude Code
 
@@ -131,7 +144,7 @@ The skills contain the safe read/write workflow, markup rules, schema details,
 and the exact Claude Desktop configuration. Use `LOGSEQ_DB_MODE=auto` only for
 non-skill deployments that intentionally support both graph types.
 
-### Step 3: Start Using
+### Step 4: Start Using
 
 ```text
 "Please help me organize my LogSeq notes. Show me what pages I have."

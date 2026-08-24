@@ -9,14 +9,25 @@ E:\git\mcp-logseq\skills\logseq-db-graph
 Configure a dedicated DB-graph MCP server. Do not set `LOGSEQ_DB_MODE=auto` for
 this skill.
 
+Install the local checkout before configuring Claude Desktop:
+
+```powershell
+Set-Location E:\git\mcp-logseq
+uv sync --extra vector
+```
+
+This creates the executable used below. Launching it directly avoids stale
+package and Git-branch caches.
+
 ```json
 {
   "mcpServers": {
     "logseq-db": {
-      "command": "C:\\Users\\YOUR_USER\\.local\\bin\\uv.exe",
-      "args": ["run", "--project", "E:\\git\\mcp-logseq", "mcp-logseq"],
+      "command": "E:\\git\\mcp-logseq\\.venv\\Scripts\\mcp-logseq.exe",
+      "args": [],
       "env": {
         "LOGSEQ_API_TOKEN": "your-logseq-api-token",
+        "LOGSEQ_API_URL": "http://127.0.0.1:12315",
         "LOGSEQ_DB_MODE": "true",
         "LOGSEQ_API_CONNECT_TIMEOUT": "10",
         "LOGSEQ_API_READ_TIMEOUT": "60",

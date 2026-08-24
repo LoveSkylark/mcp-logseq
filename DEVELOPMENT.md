@@ -43,7 +43,7 @@ LOGSEQ_API_URL=http://localhost:12315
 claude mcp add mcp-logseq-dev \
   --env LOGSEQ_API_TOKEN=your_token_here \
   --env LOGSEQ_API_URL=http://localhost:12315 \
-  -- uv run --project /path/to/mcp-logseq mcp-logseq
+  -- /path/to/mcp-logseq/.venv/bin/mcp-logseq
 ```
 
 #### For Claude Desktop (Development)
@@ -51,16 +51,12 @@ claude mcp add mcp-logseq-dev \
 {
   "mcpServers": {
     "mcp-logseq-dev": {
-      "command": "uv",
-      "args": [
-        "run", 
-        "--project",
-        "/path/to/mcp-logseq",
-        "mcp-logseq"
-      ],
+      "command": "E:\\git\\mcp-logseq\\.venv\\Scripts\\mcp-logseq.exe",
+      "args": [],
       "env": {
         "LOGSEQ_API_TOKEN": "your_token_here",
-        "LOGSEQ_API_URL": "http://localhost:12315"
+        "LOGSEQ_API_URL": "http://127.0.0.1:12315",
+        "LOGSEQ_DB_MODE": "true"
       }
     }
   }
