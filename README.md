@@ -57,6 +57,22 @@ server enables Claude to read, organize, and safely update your LogSeq graphs.
 - **Optional semantic search**: find related notes by meaning with local or
   hosted embedding providers.
 
+### Real-World Examples
+
+```text
+Read a DB page and include all nested blocks, properties, and tags.
+Find every incomplete task due this week and group the results by page.
+Review today's journal and turn the action items into tagged task blocks.
+Find all nodes tagged #Project and summarize their current Status values.
+Show every page using the Person tag and compare their typed properties.
+Explain the template structure used for new journal entries.
+Find flashcards that mention a topic and list the cards that are due.
+Locate notes about a subject with vector search, then verify the source pages.
+Rewrite these selected blocks in batches, preview the changes, and verify them.
+Inspect this stored DB query and explain what its filters and properties mean.
+Read this legacy Markdown page and preserve its file-graph properties.
+```
+
 ###  Key Benefits
 
 - **Zero Context Switching**: Claude works directly with your LogSeq data.
