@@ -19,6 +19,11 @@ selects the safe route. DB mode never uses `logseq.Editor.*`. Confirm
 either tool, or call either tool. Use `search_blocks` for text discovery,
 `get_page_data` for page structure, and `get_block` for one known block.
 
+**Tool boundary:** The names in this skill are MCP tool names, not raw Logseq
+API method names. Never send `logseq.*` method names, invent a tool, or bypass
+the MCP tool list. `logseq.DB.datascriptQuery` is an internal implementation
+detail used by the server and is never callable from Claude Desktop.
+
 ## Scope and configuration
 
 This skill is deliberately DB-only. Use a dedicated MCP server with:
@@ -393,6 +398,25 @@ read back before retrying.
 | Discover typed schemas | `list_properties` |
 | Batch mutation | `upsert_nodes` |
 | Typed property/tag operation | DB property/tag handlers |
+
+### Tool selection rules
+
+- Use `search_blocks` for DB text discovery. The general `search` tool is
+  available in mixed or auto deployments, but `search_blocks` is the explicit
+  DB workflow and returns block UUIDs and page identifiers.
+- Use `get_page_data` for DB page reads. `get_page_content` is available for
+  compatibility, but it is not the primary DB reader.
+- Use `get_block` for a known DB block. It uses the server's internal bulk
+  Datascript reader and does not call either native `getBlock` endpoint.
+- Use `upsert_nodes` for DB batch creation and edits. Use one dry-run, then one
+  commit, and verify the resulting state before continuing.
+- Do not use `insert_nested_block` in DB mode. It is unavailable because the
+  underlying single-node insert route can time out. `upsert_nodes` cannot set
+  hierarchy on Logseq 2.0.1 either; do not send `parent` or `parent-id`.
+- Do not use `query` in DB mode. Stored query text can be read and explained,
+  but it cannot be executed through the DB skill.
+- Do not call `logseq.DB.datascriptQuery`, `logseq.cli.*`, `logseq.app.*`, or
+  `logseq.Editor.*` directly. Those are server-side routes, not MCP tools.
 
 ## Full tool inventory (DB mode)
 
