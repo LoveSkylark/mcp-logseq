@@ -144,7 +144,7 @@ avoids repeated individual single-node writes.
 
 For an individual typed property/tag operation that cannot be represented by a
 batch, use the matching DB property/tag handler only after reading the current
-entity and schema. `update_block`, `insert_nested_block`, `upsert_block_property`,
+entity and schema. `update_block`, `upsert_block_property`,
 `remove_block_property`, `add_block_tag`, `remove_block_tag`, `add_tag_extends`,
 `remove_tag_extends`, `upsert_property`, `remove_property`, and `create_page`
 work on DB graphs for exactly this case -- each is a single `cli.*` write.
@@ -203,6 +203,147 @@ the hanging `cli.getBlock` or `Editor.getBlock` routes. Claude Desktop should
 call `get_page_data` or `get_block`, never `datascriptQuery` directly.
 `get_page_content` inherits the same behavior. For a single known block,
 `get_block` uses the same Datascript-backed reader.
+
+## DB feature playbook
+
+Logseq DB graphs model most features as tagged nodes, typed properties, and
+relationships. Use the MCP tools to read and write the graph data; do not ask
+for an unexposed raw Datascript tool or imitate UI-only commands with Markdown
+syntax.
+
+### Nodes, pages, and journals
+
+- A node is either a page or block. Both can be referenced with `[[]]`, tagged,
+  favorited, collapsed, embedded, and given properties.
+- Blocks are created inside pages. Blocks do not have unique display names, so
+  identify them by UUID.
+- Pages are unique by title and tag. Do not assume a title alone identifies one
+  page when tags distinguish pages.
+- Journals are pages tagged `#Journal`, created for dates in the Journals view.
+  A date property value links to the corresponding journal page. Journal
+  behavior is date-driven, not a Markdown filename convention.
+- To customize every journal, configure properties on the `#Journal` tag. Use
+  `get_page_data` for a journal page and `upsert_nodes` for supported content
+  changes.
+- Ordinary page deletion is recycled for up to 30 days. Deleting a tag,
+  property, or today's journal is permanent. Verify the target type before
+  deleting.
+
+### Tags and tag inheritance
+
+- A tag is a first-class node. Use `list_tags(expand=true)` before selecting or
+  creating one, and use `add_block_tag` or `upsert_nodes` to apply it.
+- Tag properties are inherited by every node carrying that tag. Use tags as
+  reusable schemas or types, not merely as text labels.
+- Tags can extend multiple parent tags. Child tags inherit their parents'
+  properties. Use `add_tag_extends` and `remove_tag_extends` for one-off
+  relationship changes, and verify the resulting tag afterward.
+- A tag can be converted to a page and a page can be converted to a tag in the
+  Logseq UI. Do not simulate conversion by renaming or duplicating nodes.
+- A tag on a node is normally displayed beside the node. Inline tag text and
+  semantic tag assignment are different behaviors; preserve the node's tag
+  data rather than inserting `#tag` into content as a substitute.
+- A Node-type property may restrict values to a tag and its descendant tags.
+  Resolve those tag UUIDs before writing values.
+
+### Properties
+
+- Properties can be attached to pages, blocks, tags, and property nodes. In DB
+  graphs they are typed entities, not `key:: value` lines.
+- Use `list_properties(expand=true)` to inspect type, choices, defaults,
+  cardinality, UI position, and restrictions before writing.
+- The main types are Text, Number, Date, DateTime, Checkbox, Url, and Node.
+  Number values are numeric; Date and DateTime values are temporal; Checkbox
+  values are boolean; Node values reference nodes.
+- Text is the flexible default. Url values are constrained URLs. Node values
+  may be restricted to a tag and its descendants.
+- Multiple values are supported for most types, but not Checkbox or DateTime.
+  Respect the existing schema instead of replacing a value with an array by
+  assumption.
+- Property choices constrain Text, Url, and Number values. Checkbox mappings
+  can map choices to checked/unchecked display states.
+- Built-in properties such as `Status`, `Priority`, `Deadline`, and
+  `Scheduled` power task behavior. Preserve their canonical idents and schema.
+- Page properties live on the page title node, not on the first child block.
+- Resolve display names to full idents before mutation. A bare name can create
+  a plugin-namespaced duplicate instead of updating the intended property.
+
+### Tasks and repeated nodes
+
+- Tasks are nodes tagged `#Task` and normally use `Status`, `Priority`,
+  `Deadline`, and `Scheduled` properties.
+- Use `Status` values such as `Backlog`, `Todo`, `Doing`, `In Review`, `Done`,
+  and `Canceled`; do not use legacy `TODO`/`NOW` marker conventions as DB data.
+- A Date or DateTime property can be configured to repeat. Repeating tasks
+  advance their date when completed and reset their status according to the
+  property configuration.
+- Custom task types can extend `#Task` and add tag properties. Read the tag
+  schema before assigning custom task fields.
+
+### Templates
+
+- A template is a node tagged `#Template` with child blocks containing the
+  reusable structure. The template name is the node title.
+- The `/Template` UI command inserts a copy. Applying a template is a Logseq
+  application action, not a Markdown `template::` property.
+- A template can have `Apply template to tags`. When configured, Logseq applies
+  it to newly created tagged nodes, including journals or task-like nodes.
+- The MCP can preserve, inspect, or rewrite template content, but should not
+  invoke `insert_nested_block` in DB mode. Use `upsert_nodes` for supported
+  flat creation and state clearly when hierarchy cannot be represented by the
+  current API.
+
+### Flashcards
+
+- A flashcard is a node tagged `#Card`. Use the Flashcards view to review due
+  cards and rate recall; scheduling is managed by Logseq's current spaced
+  repetition algorithm.
+- `#Card` is semantic data. Do not replace it with a `flashcard::` Markdown
+  property or assume the old file-graph SRS properties apply.
+- The `Due` value is scheduling metadata. Preserve it unless the user is
+  explicitly changing review state through a supported Logseq operation.
+
+### Embeds, assets, code, quotes, and math
+
+- Pages and blocks can be embedded as nodes. Preserve the node reference and
+  embed identity when moving content; do not flatten an embed into copied text
+  unless requested.
+- Assets are `#Asset` nodes backed by files in the graph's `assets/` directory.
+  Asset nodes can have properties and linked references. Treat paths and asset
+  UUIDs as distinct values.
+- Code, quote, and math blocks use the built-in `#Code`, `#Quote`, and `#Math`
+  tags. PDF annotations use `#PDF Annotation`. These tags enable the related
+  views and should not be replaced by formatting text alone.
+- A DB block supports one relevant code, quote, math, query, or embed form where
+  the DB model restricts it. Do not assume file-graph content containing
+  multiple such forms imports losslessly.
+
+### Queries, views, and organization
+
+- Use `search_blocks` for text discovery and `get_page_data` for page structure.
+  Use `query` only for the MCP's supported DB DSL operations.
+- DB query vocabulary uses `(property ...)`, `(tags ...)`, and `:block/title`.
+  Legacy `(page-property ...)`, `(page-tags ...)`, and `:block/content` forms
+  are file-graph conventions.
+- Tables and views are application-managed projections over nodes and
+  properties. Treat them as derived views, not as a second source of truth.
+- Use tags for shared semantics and properties for typed values. Use the
+  Library page for explicit page hierarchy and namespaces; page titles no
+  longer encode namespace paths as they did in file graphs.
+- Timestamps are built into nodes. Prefer `created-at` and `updated-at` data
+  when selecting recent or stale content rather than inferring dates from page
+  names.
+
+### Import, export, and recovery
+
+- DB graph export can include SQLite, assets, or EDN. EDN is the editable export
+  that best preserves graph data, properties, and tags.
+- Before a broad rewrite, create an export or backup and keep a manifest of
+  UUIDs and intended operations. Do not treat an MCP timeout as proof that no
+  mutation occurred.
+- For a large rewrite, use validated `upsert_nodes` batches, record completed
+  operation IDs, read back after each batch, and stop on the first uncertain
+  result. Never blindly replay an entire batch after a timeout.
 
 ## Minimal-diff rules
 
@@ -279,8 +420,9 @@ Use `upsert_nodes` or
   compare arguments to the verified workflow before retrying, and consider
   whether prior failed writes in the same session have wedged the write path
   (a Logseq restart clears it) rather than assuming the route is broken.
-- `get_block(include_children=false)` is a known Logseq 2.0.1 hang. Always use
-  `true`.
+- DB `get_block` uses the MCP's Datascript-backed reader for both values of
+  `include_children`; `false` returns child UUID references without expanding
+  descendant objects. It does not call Logseq's hanging native `getBlock` API.
 - `get_page_data` is the DB-native page reader; prefer it directly over
   `get_page_content` for clarity, even though `get_page_content` also works
   in DB mode now (it delegates to `get_page_data` internally).
