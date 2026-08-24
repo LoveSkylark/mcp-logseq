@@ -18,6 +18,25 @@ structure, the implemented changes, and current limitations.
 > grant permission deliberately. AI clients often ask for confirmation before
 > destructive actions, but permission prompts are not guaranteed by this MCP.
 
+## Start Here: Choose a Skill
+
+For Claude Desktop, load exactly one of the graph-specific skills before
+working with Logseq. The skills provide the operational rules for choosing
+tools, reading complete pages, handling DB properties and tags, planning
+mutations, verifying writes, and avoiding unsupported or risky API paths.
+
+- [Logseq DB graph skill](skills/logseq-db-graph/SKILL.md) for Logseq 2.x DB
+  graphs. Set `LOGSEQ_DB_MODE=true`.
+- [Logseq file graph skill](skills/logseq-file-graph/SKILL.md) for legacy
+  Markdown graphs. Set `LOGSEQ_DB_MODE=false`.
+
+Do not load both skills in the same conversation. ChatGPT can connect to this
+server through the remote HTTP MCP setup described in
+[INSTALLATION.md](INSTALLATION.md), but there is currently no equivalent
+ChatGPT skill package or skill-loading workflow. For ChatGPT, use the MCP
+tool descriptions, the installation guide, and the graph-mode environment
+setting as the source of operational guidance.
+
 ##  What You Can Do
 
 Transform your LogSeq knowledge base into an AI-powered workspace. This MCP
