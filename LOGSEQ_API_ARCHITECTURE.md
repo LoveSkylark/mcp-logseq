@@ -311,10 +311,10 @@ Block hierarchy example:
 
 | Operation | Tool | Status |
 | --------- | ---- | ------ |
-| Read | `get_page_content` |  |
-| Create | `insert_nested_block` |  |
-| Delete | `delete_block` |  |
-| Update | `update_block` |  |
+| Read | `get_page_content` | ✅ |
+| Create | `insert_nested_block` | ✅ |
+| Delete | `delete_block` | ✅ |
+| Update | `update_block` | ✅ |
 
 ## Future Research Areas
 - **Graph context** (`logseq.App.getCurrentGraph`) - Expose which graph is active. Low effort, useful for multi-graph setups.

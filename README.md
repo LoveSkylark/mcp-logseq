@@ -232,50 +232,50 @@ from a single test.
 
 | Tool | File | DB |
 | --- | :---: | :---: |
-| `upsert_nodes` | |  |
-| `get_page_data` | |  |
-| `list_tags` | |  |
-| `list_properties` | |  |
-| `search_blocks` | |  |
-| `get_property` | |  |
-| `upsert_property` | |  |
-| `remove_property` | |  |
-| `get_block_properties` | |  |
-| `get_block_property` | |  |
-| `upsert_block_property` | |  |
-| `remove_block_property` | |  |
-| `get_tag` | |  |
-| `get_tag_objects` | |  |
-| `get_tags_by_name` | |  |
-| `create_tag` | |  |
-| `add_block_tag` | |  |
-| `remove_block_tag` | |  |
-| `add_tag_property` | |  |
-| `remove_tag_property` | |  |
-| `add_tag_extends` | |  |
-| `remove_tag_extends` | |  |
-| `create_page` |  |  |
-| `update_page` |  | |
-| `list_pages` |  |  |
-| `get_page_content` |  |  |
-| `delete_page` |  |  |
-| `delete_block` |  |  |
-| `update_block` |  |  |
-| `get_block` |  |  |
-| `search` |  |  |
-| `query` |  | |
-| `find_pages_by_property` |  | |
-| `get_pages_from_namespace` |  | |
-| `get_pages_tree_from_namespace` |  | |
-| `rename_page` |  |  |
-| `get_page_backlinks` |  | |
-| `insert_nested_block` |  | |
-| `set_block_properties` | |  |
-| `vector_search`  |  |  |
-| `sync_vector_db`  |  |  |
-| `vector_db_status`  |  |  |
+| `upsert_nodes` | | ✅ |
+| `get_page_data` | | ✅ |
+| `list_tags` | | ✅ |
+| `list_properties` | | ✅ |
+| `search_blocks` | | ✅ |
+| `get_property` | | ✅ |
+| `upsert_property` | | ✅ |
+| `remove_property` | | ✅ |
+| `get_block_properties` | | ✅ |
+| `get_block_property` | | ✅ |
+| `upsert_block_property` | | ✅ |
+| `remove_block_property` | | ✅ |
+| `get_tag` | | ✅ |
+| `get_tag_objects` | | ✅ |
+| `get_tags_by_name` | | ✅ |
+| `create_tag` | | ✅ |
+| `add_block_tag` | | ✅ |
+| `remove_block_tag` | | ✅ |
+| `add_tag_property` | | ✅ |
+| `remove_tag_property` | | ✅ |
+| `add_tag_extends` | | ✅ |
+| `remove_tag_extends` | | ✅ |
+| `create_page` | ✅ | ✅ |
+| `update_page` | ✅ | |
+| `list_pages` | ✅ | ✅ |
+| `get_page_content` | ✅ | ✅ |
+| `delete_page` | ✅ | ✅ |
+| `delete_block` | ✅ | ✅ |
+| `update_block` | ✅ | ✅ |
+| `get_block` | ✅ | ✅ |
+| `search` | ✅ | ✅ |
+| `query` | ✅ | |
+| `find_pages_by_property` | ✅ | |
+| `get_pages_from_namespace` | ✅ | |
+| `get_pages_tree_from_namespace` | ✅ | |
+| `rename_page` | ✅ | ✅ |
+| `get_page_backlinks` | ✅ | |
+| `insert_nested_block` | ✅ | |
+| `set_block_properties` | | ✅ |
+| `vector_search` ⚗️ | ✅ | ✅ |
+| `sync_vector_db` ⚗️ | ✅ | ✅ |
+| `vector_db_status` ⚗️ | ✅ | ✅ |
 
-- ****: works in both graph modes, or is DB-native and works in DB mode.
+- **✅**: works in both graph modes, or is DB-native and works in DB mode.
 - **`Editor.*` writes can wedge after repeated calls in one session** and
   need a Logseq restart to recover - a hang during testing does not always
   mean a route is broken. `delete_block` was initially misclassified as
@@ -309,7 +309,7 @@ For the full API surface and Logseq 2.0.1 namespace behavior, see
 | **`sync_vector_db`**  | Point to the external vector sync writer |
 | **`vector_db_status`**  | Show vector DB health and staleness |
 
- *Requires vector search setup. See [VECTOR_SEARCH.md](VECTOR_SEARCH.md).*
+⚗️ *Requires vector search setup. See [VECTOR_SEARCH.md](VECTOR_SEARCH.md).*
 
 For detailed DB batch operations, dry-run validation, Markdown parsing, and
 safe retry rules, use the matching graph skill rather than duplicating those
