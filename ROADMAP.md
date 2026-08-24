@@ -1,79 +1,93 @@
-# LogSeq MCP Server Roadmap
+# Logseq MCP Roadmap
 
-## Implemented Features
+This roadmap describes the current DB-aware derivative of the original
+`mcp-logseq` project. Completed items reflect the implementation in `main`.
 
-### Core Functionality
-- ✅ LogSeq API client setup with proper error handling and logging
-- ✅ Environment variable configuration for API token
-- ✅ Basic project structure and package setup
-- ✅ **Complete CRUD Operations** for LogSeq pages
-- ✅ Comprehensive API architecture documentation
-- ✅ Pre-validation and robust error handling
+## Completed
 
-### Tools
-- ✅ Create Page (`create_page`)
-  - Create new pages with content
-  - Support for basic markdown content
-- ✅ List Pages (`list_pages`)
-  - List all pages in the graph
-  - Filter journal/daily notes
-  - Alphabetical sorting
-- ✅ Get Page Content (`get_page_content`)
-  - Retrieve content of a specific page
-  - Support for JSON and text output formats
-  - Multi-step retrieval (page metadata + blocks + properties)
-- ✅ Delete Page (`delete_page`)
-  - Remove pages from the graph
-  - Pre-deletion validation and safety checks
-  - Enhanced error handling with user-friendly messages
-- ✅ Update Page (`update_page`)
-  - Update existing page content and/or properties
-  - Support for appending content to existing pages
-  - Page properties management with fallback methods
-  - Flexible usage: content-only, properties-only, or both
-- ✅ Search functionality (`search`)
-  - Native LogSeq search integration via HTTP API
-  - Full-text search across blocks, pages, and files
-  - Configurable result filtering and limits
-  - Rich result formatting with snippets and pagination
-- ✅ Insert Nested Block (`insert_nested_block`)
-  - Create hierarchical block structures
-  - Insert blocks as children or siblings
-  - Support for block properties (markers, tags, etc.)
-  - Enable complex nested note-taking workflows
+### Architecture and MCP
 
-## Planned Features
+- ✅ Upgraded to the MCP Python SDK 2.x dependency range.
+- ✅ Split the original monolithic API client into focused `logseq/` mixins.
+- ✅ Split the original tool module into grouped `tools/` handlers.
+- ✅ Added stdio and authenticated HTTP transports.
+- ✅ Added read-only server mode and explicit File/DB tool profiles.
+- ✅ Added portable local-checkout and GitHub installation documentation.
+- ✅ Added ChatGPT remote MCP deployment guidance.
+
+### Logseq DB Graphs
+
+- ✅ Added explicit DB mode with `LOGSEQ_DB_MODE=true`.
+- ✅ Added DB page, block, property, tag, search, and batch tools.
+- ✅ Added UUID and numeric `db/id` handling.
+- ✅ Added typed properties, tag inheritance, journals, tasks, templates,
+  flashcards, embeds, assets, queries, views, and Library guidance.
+- ✅ Added verified DB route selection with no silent File/DB fallback.
+- ✅ Added Datascript-backed block reads and recursive in-memory block trees.
+- ✅ Added safe nested expansion for `get_block`, `get_page_data`, and
+  `get_page_content` without calling the hanging native `getBlock` routes.
+- ✅ Added validated `upsert_nodes` batches for pages, flat blocks, tags, and
+  properties.
+- ✅ Added dry-run validation, UUID checks, access checks, and read-back rules.
+
+### Safety and Operations
+
+- ✅ Added namespace allowlists and denylists.
+- ✅ Added excluded-tag filtering and fail-closed access checks.
+- ✅ Added outbound Logseq method and request-shape validation.
+- ✅ Added bounded read deadlines and maximum response sizes.
+- ✅ Added timeout, restart, and ambiguous-write recovery guidance.
+- ✅ Added optional vector search, pluggable embedding providers, and external
+  vector synchronization.
+- ✅ Added unit, integration, and Windows live-test harness coverage.
+
+### Documentation
+
+- ✅ Updated README, development, testing, API architecture, and installation
+  documentation.
+- ✅ Added separate DB and file-graph skills.
+- ✅ Added project derivation history and original repository references.
+- ✅ Added destructive-operation warnings and portable deployment examples.
+
+## Current Limitations
+
+- ⚠️ DB `upsert_nodes` is flat-only on the tested Logseq 2.0.1 API. Logseq
+  rejects `parent` and `parent-id` data keys.
+- ⚠️ DB `insert_nested_block` is disabled because the native `cli.insertBlock`
+  route can time out. Use `upsert_nodes` for supported flat block creation.
+- ⚠️ DB namespace page tools return a clean HTTP 500 on the tested Logseq
+  2.0.1 build.
+- ⚠️ Raw Datascript is an internal implementation detail and is not exposed as
+  an MCP tool.
+- ⚠️ A timed-out write may have committed. Large changes require chunking,
+  dry-run validation, incremental commits, and read-back verification.
+
+## Next Work
 
 ### High Priority
 
+- Add a resumable batch-rewrite workflow with operation manifests,
+  checkpoints, and duplicate prevention.
+- Build a host-side live route regression suite for the supported DB methods.
+- Re-test supported write routes across clean Logseq restarts and versions.
+
 ### Medium Priority
--  Block Level Operations
-  - Create/update/delete blocks
-  - Move blocks between pages
+
+- Investigate a supported DB hierarchy-writing API when Logseq exposes one.
+- Improve bulk Datascript reads with page-scoped queries for very large graphs.
+- Add clearer capability metadata for tools unavailable in forced DB mode.
 
 ### Low Priority
--  Graph Management
-  - List available graphs
-  - Switch between graphs
--  Journal Pages Management
-  - Create/update daily notes
-  - Special handling for journal pages
--  Page Templates
-  - Create pages from templates
-  - Manage template library
 
-## Technical Improvements
-- ✅ Better error handling for API responses
-- ✅ Comprehensive logging for debugging
-- ✅ Unit tests for core functionality
-- ✅ Integration tests with LogSeq
--  **Documentation**
-  -  Complete installation guide for Claude Code and Claude Desktop
-  -  Prerequisites and LogSeq setup instructions
-  -  Configuration examples and troubleshooting
-  -  Accurate tool descriptions and usage examples
+- Choose and execute a compatibility-aware package and repository rename.
+- Maintain version-visible deployment diagnostics for stale client installs.
+- Track Logseq DB API changes and update the route manifest as new versions
+  become available.
 
 ## Notes
-- Priority levels may change based on user feedback
-- Some features depend on LogSeq Local REST API capabilities
-- Features might be adjusted as LogSeq's API evolves
+
+- The original project remains at https://github.com/ergut/mcp-logseq.
+- This repository is a substantially expanded derivative at
+  https://github.com/LoveSkylark/mcp-logseq.
+- Logseq API behavior is version-sensitive. Live verification against the
+  target Logseq release takes precedence over assumptions from older versions.
