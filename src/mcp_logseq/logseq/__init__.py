@@ -6,6 +6,93 @@ from typing import Any
 logger = logging.getLogger("mcp-logseq")
 
 
+_ALLOWED_API_METHODS = frozenset({
+    "logseq.App.checkCurrentIsDbGraph",
+    "logseq.App.getCurrentGraph",
+    "logseq.App.search",
+    "logseq.DB.datascriptQuery",
+    "logseq.DB.q",
+    "logseq.Editor.addBlockTag",
+    "logseq.Editor.addTagExtends",
+    "logseq.Editor.addTagProperty",
+    "logseq.Editor.appendBlockInPage",
+    "logseq.Editor.createPage",
+    "logseq.Editor.createTag",
+    "logseq.Editor.deletePage",
+    "logseq.Editor.getBlock",
+    "logseq.Editor.getAllPages",
+    "logseq.Editor.getPage",
+    "logseq.Editor.getPageBlocksTree",
+    "logseq.Editor.getPageLinkedReferences",
+    "logseq.Editor.getPagesFromNamespace",
+    "logseq.Editor.getPagesTreeFromNamespace",
+    "logseq.Editor.getProperty",
+    "logseq.Editor.getTag",
+    "logseq.Editor.getTagObjects",
+    "logseq.Editor.getTagsByName",
+    "logseq.Editor.insertBatchBlock",
+    "logseq.Editor.insertBlock",
+    "logseq.Editor.removeBlock",
+    "logseq.Editor.removeBlockProperty",
+    "logseq.Editor.removeBlockTag",
+    "logseq.Editor.removeProperty",
+    "logseq.Editor.removeTagExtends",
+    "logseq.Editor.removeTagProperty",
+    "logseq.Editor.renamePage",
+    "logseq.Editor.setPageProperties",
+    "logseq.Editor.updateBlock",
+    "logseq.Editor.upsertBlockProperty",
+    "logseq.Editor.upsertProperty",
+    "logseq.cli.addBlockTag",
+    "logseq.cli.addTagExtends",
+    "logseq.cli.addTagProperty",
+    "logseq.cli.createPage",
+    "logseq.cli.createTag",
+    "logseq.cli.deletePage",
+    "logseq.cli.getBlock",
+    "logseq.cli.getBlockProperties",
+    "logseq.cli.getBlockProperty",
+    "logseq.cli.getPageData",
+    "logseq.cli.getProperty",
+    "logseq.cli.getTag",
+    "logseq.cli.getTagObjects",
+    "logseq.cli.getTagsByName",
+    "logseq.cli.insertBlock",
+    "logseq.cli.listPages",
+    "logseq.cli.listProperties",
+    "logseq.cli.listTags",
+    "logseq.cli.removeBlock",
+    "logseq.cli.removeBlockProperty",
+    "logseq.cli.removeBlockTag",
+    "logseq.cli.removeProperty",
+    "logseq.cli.removeTagExtends",
+    "logseq.cli.removeTagProperty",
+    "logseq.cli.renamePage",
+    "logseq.cli.updateBlock",
+    "logseq.cli.upsertBlockProperty",
+    "logseq.cli.upsertNodes",
+    "logseq.cli.upsertProperty",
+    "logseq.app.search",
+})
+
+
+class SafeAPISession(requests.Session):
+    """Reject malformed or unknown Logseq requests before they reach Logseq."""
+
+    def post(self, url, **kwargs):
+        payload = kwargs.get("json")
+        if not isinstance(payload, dict) or set(payload) != {"method", "args"}:
+            raise ValueError(
+                "Logseq API request must contain only 'method' and 'args'"
+            )
+        method = payload["method"]
+        if method not in _ALLOWED_API_METHODS:
+            raise ValueError(f"Logseq API method is not allowed: {method!r}")
+        if not isinstance(payload["args"], list):
+            raise ValueError("Logseq API request 'args' must be a list")
+        return super().post(url, **kwargs)
+
+
 @dataclass(frozen=True)
 class GraphOperationRoute:
     """Method mapping for one logical MCP operation across graph models.
@@ -230,7 +317,7 @@ class LogSeq(PageMixin, BlockMixin, PropertyMixin, TagMixin, SearchMixin):
         self.timeout = timeout or (3, 6)
 
         # Reuse connections while allowing concurrent MCP requests to proceed.
-        self._session = requests.Session()
+        self._session = SafeAPISession()
         adapter = requests.adapters.HTTPAdapter(
             pool_connections=10,
             pool_maxsize=10,

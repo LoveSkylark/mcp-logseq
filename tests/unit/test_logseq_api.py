@@ -51,6 +51,29 @@ class TestLogSeqAPI:
         assert client._method_for("list_pages") == "logseq.cli.listPages"
         assert client._method_for("search") == "logseq.app.search"
 
+    def test_api_session_rejects_unknown_method_before_http(self, mock_api_key):
+        client = LogSeq(api_key=mock_api_key)
+
+        with pytest.raises(ValueError, match="method is not allowed"):
+            client._session.post(
+                client.get_base_url(),
+                json={"method": "logseq.Editor.notARealMethod", "args": []},
+            )
+
+    @pytest.mark.parametrize(
+        "payload",
+        [
+            {"method": "logseq.cli.listPages", "args": {}},
+            {"method": "logseq.cli.listPages", "args": [], "extra": True},
+            {"method": "logseq.cli.listPages"},
+        ],
+    )
+    def test_api_session_rejects_invalid_request_shape(self, mock_api_key, payload):
+        client = LogSeq(api_key=mock_api_key)
+
+        with pytest.raises(ValueError, match="method.*args|args.*list"):
+            client._session.post(client.get_base_url(), json=payload)
+
     def test_db_rejected_route_raises_instead_of_falling_back(self, mock_api_key):
         """Hard File/DB split: a rejected or untested DB route raises rather
         than silently using the Editor.* method (no cross-namespace fallback)."""
