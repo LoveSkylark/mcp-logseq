@@ -104,9 +104,9 @@ server enables Claude to read, organize, and safely update your LogSeq graphs.
 ### Step 2: Install and Connect the MCP
 
 See **[INSTALLATION.md](INSTALLATION.md)** for complete setup instructions
-for Claude Code and Claude Desktop, both from a local checkout and directly
-from GitHub. The guide also explains the `uv` commands, cache behavior, graph
-mode, and deployment verification.
+for Claude Code, Claude Desktop, and ChatGPT, both from a local checkout and
+directly from GitHub. The guide also explains the `uv` commands, cache
+behavior, graph mode, remote HTTP deployment, and verification.
 
 #### Claude Desktop skills
 

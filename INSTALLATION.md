@@ -219,3 +219,58 @@ uv sync --extra vector
 ```
 
 Restart the MCP client after updating. The MCP process loads code at startup.
+
+## ChatGPT: Remote MCP Connection
+
+ChatGPT connects to remote MCP servers. It does not launch a local stdio
+executable such as `.venv/Scripts/mcp-logseq.exe` directly. To connect this
+project to ChatGPT, run `mcp-logseq` with HTTP transport and provide ChatGPT
+with a reachable HTTPS MCP endpoint.
+
+Start the server from the local checkout:
+
+```powershell
+Set-Location "<REPO_DIR>"
+uv sync --extra vector
+$env:LOGSEQ_DB_MODE = "true"
+$env:LOGSEQ_API_TOKEN = "your-logseq-api-token"
+$env:MCP_HTTP_AUTH_TOKEN = "your-mcp-http-token"
+& ".\.venv\Scripts\mcp-logseq.exe" --transport http --host 127.0.0.1 --port 12320
+```
+
+The MCP endpoint is:
+
+```text
+http://127.0.0.1:12320/mcp
+```
+
+Do not expose that plain HTTP address to the public internet. For ChatGPT,
+place the server behind an HTTPS reverse proxy or use an OpenAI-supported
+[Secure MCP Tunnel](https://developers.openai.com/api/docs/guides/secure-mcp-tunnels)
+so the endpoint is reachable without exposing the local machine directly.
+The remote endpoint must preserve the `/mcp` path and forward the bearer
+authorization header.
+
+In ChatGPT web, enable Developer mode or custom MCP apps if your plan and
+workspace allow it, create a custom app/connector, enter the HTTPS MCP
+endpoint, select the supported authentication mechanism, scan the tools, and
+test the draft app. Review the requested actions before publishing. ChatGPT
+may ask for confirmation for write actions, but app permissions and workspace
+policy determine which actions are available.
+
+Full MCP write support is currently available in beta for ChatGPT Business,
+Enterprise, and Edu workspaces. Other plans may provide only read/fetch access.
+ChatGPT custom apps are web-only, and workspace admins may need to enable
+Developer mode and approve or refresh the app's actions after server changes.
+
+For a read-only ChatGPT connection, add `--read-only` to the server command.
+This removes Logseq write tools from the exposed MCP server:
+
+```powershell
+& ".\.venv\Scripts\mcp-logseq.exe" --transport http --host 127.0.0.1 --port 12320 --read-only
+```
+
+For a DB graph, also set `LOGSEQ_DB_MODE=true`; for a legacy file graph, use
+`LOGSEQ_DB_MODE=false`. Keep `MCP_HTTP_AUTH_TOKEN` separate from the Logseq
+API token. The first authenticates the remote MCP client, while the second
+authenticates this server to Logseq.
