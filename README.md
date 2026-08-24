@@ -18,7 +18,7 @@ structure, the implemented changes, and current limitations.
 > grant permission deliberately. AI clients often ask for confirmation before
 > destructive actions, but permission prompts are not guaranteed by this MCP.
 
-## ✨ What You Can Do
+##  What You Can Do
 
 Transform your LogSeq knowledge base into an AI-powered workspace. This MCP
 server enables Claude to read, organize, and safely update your LogSeq graphs.
@@ -38,9 +38,9 @@ server enables Claude to read, organize, and safely update your LogSeq graphs.
 - **Optional semantic search**: find related notes by meaning with local or
   hosted embedding providers.
 
-### 🎯 Real-World Examples
+###  Real-World Examples
 
-#### 📊 Intelligent Knowledge Management
+####  Intelligent Knowledge Management
 
 ```text
 "Analyze all my project notes from the past month and create a status summary"
@@ -48,7 +48,7 @@ server enables Claude to read, organize, and safely update your LogSeq graphs.
 "Search for incomplete tasks across all my pages"
 ```
 
-#### 📝 Automated Content Creation
+####  Automated Content Creation
 
 ```text
 "Create a new page called 'Today's Standup' with my meeting notes"
@@ -56,7 +56,7 @@ server enables Claude to read, organize, and safely update your LogSeq graphs.
 "Create a weekly review page from my recent notes"
 ```
 
-#### 🔍 Smart Research & Analysis
+####  Smart Research & Analysis
 
 ```text
 "Compare my notes on React vs Vue and highlight key differences"
@@ -64,7 +64,7 @@ server enables Claude to read, organize, and safely update your LogSeq graphs.
 "Create a knowledge map connecting related topics across pages"
 ```
 
-#### 🧠 Semantic Search *(optional, requires vector setup)*
+####  Semantic Search *(optional, requires vector setup)*
 
 ```text
 "Find everything I wrote about burnout, even if I didn't use that word"
@@ -72,7 +72,7 @@ server enables Claude to read, organize, and safely update your LogSeq graphs.
 "Search across my Dutch and English notes for ideas about productivity"
 ```
 
-#### 🤝 Meeting & Documentation Workflow
+####  Meeting & Documentation Workflow
 
 ```text
 "Read my meeting notes and create individual task pages for each action item"
@@ -80,7 +80,7 @@ server enables Claude to read, organize, and safely update your LogSeq graphs.
 "Search for 'Q4 planning' and organize all related content into a new overview page"
 ```
 
-### 💡 Key Benefits
+###  Key Benefits
 
 - **Zero Context Switching**: Claude works directly with your LogSeq data.
 - **Preserve Your Workflow**: No need to export or copy content manually.
@@ -93,13 +93,13 @@ server enables Claude to read, organize, and safely update your LogSeq graphs.
 
 ---
 
-## 🚀 Quick Start
+##  Quick Start
 
 ### Step 1: Enable LogSeq API
 
-1. **Settings** → **Features** → Check "Enable HTTP APIs server"
-2. Click the **API button (🔌)** in LogSeq → **"Start server"**
-3. **Generate API token**: API panel → "Authorization tokens" → Create new
+1. **Settings**  **Features**  Check "Enable HTTP APIs server"
+2. Click the **API button ()** in LogSeq  **"Start server"**
+3. **Generate API token**: API panel  "Authorization tokens"  Create new
 
 ### Step 2: Install and Connect the MCP
 
@@ -145,7 +145,7 @@ DB graph.
 
 ---
 
-## 🔬 Vector Search (Optional)
+##  Vector Search (Optional)
 
 Semantic search over your Logseq graph using configurable embeddings. Find notes
 by meaning, not just keywords, across pages using vector similarity and full-text
@@ -153,11 +153,11 @@ search with cross-language support.
 
 Use [Ollama](https://ollama.com) for fully local embeddings, OpenAI, or another OpenAI-compatible embeddings endpoint. [LanceDB](https://lancedb.com) remains local in every configuration. Hosted providers receive the note text being embedded.
 
-→ **[Full setup guide: VECTOR_SEARCH.md](VECTOR_SEARCH.md)**
+ **[Full setup guide: VECTOR_SEARCH.md](VECTOR_SEARCH.md)**
 
 ---
 
-## 🛠️ Available Tools
+##  Available Tools
 
 The server provides 39 verified standard tools, grouped by graph type, plus 3 optional vector tools.
 
@@ -211,7 +211,7 @@ not the same thing as the Logseq API method name.
 | Read properties | Markdown properties / `Editor.*` compatibility behavior | `list_properties` -> `logseq.cli.listProperties` |
 
 When the graph is DB-based, prefer the DB column in this table. DB graphs use
-`logseq.DB.*`, `logseq.cli.*`, and `logseq.app.*` by operation — there is no fallback to
+`logseq.DB.*`, `logseq.cli.*`, and `logseq.app.*` by operation - there is no fallback to
 `logseq.Editor.*`, so an operation with no verified `cli.*` route is simply
 unavailable rather than silently using the file-graph API. See
 [Tool Availability by Graph Type](#tool-availability-by-graph-type) below for
@@ -224,60 +224,60 @@ A tool is only registered when `LOGSEQ_DB_MODE` is forced to `true` or
 unsupported one fails at call time with an "available only for..." /
 "not available for Logseq DB graphs" message.
 
-DB graphs use `logseq.DB.*`, `logseq.cli.*`, and `logseq.app.*` by operation — there is **no fallback** to
+DB graphs use `logseq.DB.*`, `logseq.cli.*`, and `logseq.app.*` by operation - there is **no fallback** to
 `logseq.Editor.*` when a `cli.*` route hangs or errors. `Editor.*` writes can
 wedge after several calls in one session and need a Logseq restart to
-recover — see the note below the table before concluding a route is broken
+recover - see the note below the table before concluding a route is broken
 from a single test.
 
 | Tool | File | DB |
 | --- | :---: | :---: |
-| `upsert_nodes` | | ✅ |
-| `get_page_data` | | ✅ |
-| `list_tags` | | ✅ |
-| `list_properties` | | ✅ |
-| `search_blocks` | | ✅ |
-| `get_property` | | ✅ |
-| `upsert_property` | | ✅ |
-| `remove_property` | | ✅ |
-| `get_block_properties` | | ✅ |
-| `get_block_property` | | ✅ |
-| `upsert_block_property` | | ✅ |
-| `remove_block_property` | | ✅ |
-| `get_tag` | | ✅ |
-| `get_tag_objects` | | ✅ |
-| `get_tags_by_name` | | ✅ |
-| `create_tag` | | ✅ |
-| `add_block_tag` | | ✅ |
-| `remove_block_tag` | | ✅ |
-| `add_tag_property` | | ✅ |
-| `remove_tag_property` | | ✅ |
-| `add_tag_extends` | | ✅ |
-| `remove_tag_extends` | | ✅ |
-| `create_page` | ✅ | ✅ |
-| `update_page` | ✅ | |
-| `list_pages` | ✅ | ✅ |
-| `get_page_content` | ✅ | ✅ |
-| `delete_page` | ✅ | ✅ |
-| `delete_block` | ✅ | ✅ |
-| `update_block` | ✅ | ✅ |
-| `get_block` | ✅ | ✅ |
-| `search` | ✅ | ✅ |
-| `query` | ✅ | |
-| `find_pages_by_property` | ✅ | |
-| `get_pages_from_namespace` | ✅ | |
-| `get_pages_tree_from_namespace` | ✅ | |
-| `rename_page` | ✅ | ✅ |
-| `get_page_backlinks` | ✅ | |
-| `insert_nested_block` | ✅ | |
-| `set_block_properties` | | ✅ |
-| `vector_search` ⚗️ | ✅ | ✅ |
-| `sync_vector_db` ⚗️ | ✅ | ✅ |
-| `vector_db_status` ⚗️ | ✅ | ✅ |
+| `upsert_nodes` | |  |
+| `get_page_data` | |  |
+| `list_tags` | |  |
+| `list_properties` | |  |
+| `search_blocks` | |  |
+| `get_property` | |  |
+| `upsert_property` | |  |
+| `remove_property` | |  |
+| `get_block_properties` | |  |
+| `get_block_property` | |  |
+| `upsert_block_property` | |  |
+| `remove_block_property` | |  |
+| `get_tag` | |  |
+| `get_tag_objects` | |  |
+| `get_tags_by_name` | |  |
+| `create_tag` | |  |
+| `add_block_tag` | |  |
+| `remove_block_tag` | |  |
+| `add_tag_property` | |  |
+| `remove_tag_property` | |  |
+| `add_tag_extends` | |  |
+| `remove_tag_extends` | |  |
+| `create_page` |  |  |
+| `update_page` |  | |
+| `list_pages` |  |  |
+| `get_page_content` |  |  |
+| `delete_page` |  |  |
+| `delete_block` |  |  |
+| `update_block` |  |  |
+| `get_block` |  |  |
+| `search` |  |  |
+| `query` |  | |
+| `find_pages_by_property` |  | |
+| `get_pages_from_namespace` |  | |
+| `get_pages_tree_from_namespace` |  | |
+| `rename_page` |  |  |
+| `get_page_backlinks` |  | |
+| `insert_nested_block` |  | |
+| `set_block_properties` | |  |
+| `vector_search`  |  |  |
+| `sync_vector_db`  |  |  |
+| `vector_db_status`  |  |  |
 
-- **✅**: works in both graph modes, or is DB-native and works in DB mode.
+- ****: works in both graph modes, or is DB-native and works in DB mode.
 - **`Editor.*` writes can wedge after repeated calls in one session** and
-  need a Logseq restart to recover — a hang during testing does not always
+  need a Logseq restart to recover - a hang during testing does not always
   mean a route is broken. `delete_block` was initially misclassified as
   unavailable for exactly this reason: repeated failed attempts in one
   session wedged the write path, and re-testing the same session kept
@@ -305,11 +305,11 @@ For the full API surface and Logseq 2.0.1 namespace behavior, see
 
 | Tool | Purpose |
 | --- | --- |
-| **`vector_search`** ⚗️ | Semantic search by meaning |
-| **`sync_vector_db`** ⚗️ | Point to the external vector sync writer |
-| **`vector_db_status`** ⚗️ | Show vector DB health and staleness |
+| **`vector_search`**  | Semantic search by meaning |
+| **`sync_vector_db`**  | Point to the external vector sync writer |
+| **`vector_db_status`**  | Show vector DB health and staleness |
 
-⚗️ *Requires vector search setup. See [VECTOR_SEARCH.md](VECTOR_SEARCH.md).*
+ *Requires vector search setup. See [VECTOR_SEARCH.md](VECTOR_SEARCH.md).*
 
 For detailed DB batch operations, dry-run validation, Markdown parsing, and
 safe retry rules, use the matching graph skill rather than duplicating those
@@ -317,7 +317,7 @@ workflows in this overview.
 
 ---
 
-## ⚙️ Prerequisites
+##  Prerequisites
 
 Logseq must be running with its HTTP API server enabled and an API token. See
 [Quick Start](#-quick-start) for the setup sequence.
@@ -329,7 +329,7 @@ Logseq must be running with its HTTP API server enabled and an API token. See
 
 ---
 
-## 🔧 Configuration
+##  Configuration
 
 ### Environment Variables
 
@@ -426,7 +426,7 @@ Access control is enforced at the **page** level and applied across every tool: 
 
 This is global, shaping the shared DB for every consumer. It keeps unwanted content off disk entirely rather than filtering it on read, which is useful for secrets you never want embedded or for keeping the index small. Matching is segment-based and case-insensitive. Because it changes what the index contains, it takes effect only after a full re-index: `logseq-sync --rebuild`.
 
-### 🌐 Serving over HTTP, multi-profile & TLS
+###  Serving over HTTP, multi-profile & TLS
 
 By default the server speaks **stdio**: your client spawns it as a subprocess, and most users need nothing more. To serve **sandboxed or remote clients** over the network, `mcp-logseq` can run as a long-lived HTTP service with bearer auth, per-profile isolation, and TLS:
 
@@ -455,7 +455,7 @@ export LOGSEQ_API_URL=http://localhost:12315
 
 ---
 
-## 🔍 Verification & Testing
+##  Verification & Testing
 
 ### Test LogSeq Connection
 
@@ -481,16 +481,16 @@ npx @modelcontextprotocol/inspector uv run --with mcp-logseq mcp-logseq
 
 ---
 
-## 🐛 Troubleshooting
+##  Troubleshooting
 
 ### Common Issues
 
 #### "LOGSEQ_API_TOKEN environment variable required"
 
-- ✅ Enable HTTP APIs in **Settings → Features**
-- ✅ Click **🔌 button** → **"Start server"** in LogSeq
-- ✅ Generate token in **API panel → Authorization tokens**
-- ✅ Verify token in your configuration
+-  Enable HTTP APIs in **Settings  Features**
+-  Click ** button**  **"Start server"** in LogSeq
+-  Generate token in **API panel  Authorization tokens**
+-  Verify token in your configuration
 
 #### "spawn uv ENOENT" (Claude Desktop)
 
@@ -522,14 +522,14 @@ Update config with full path:
 
 #### Connection Issues
 
-- ✅ Confirm LogSeq is running
-- ✅ Verify API server is **started** (not just enabled)
-- ✅ Check port 12315 is accessible
-- ✅ Test with verification command above
+-  Confirm LogSeq is running
+-  Verify API server is **started** (not just enabled)
+-  Check port 12315 is accessible
+-  Test with verification command above
 
 ---
 
-## 👩‍💻 Development
+##  Development
 
 For local development, testing, and contributing, see **[DEVELOPMENT.md](DEVELOPMENT.md)**.
 
@@ -537,29 +537,29 @@ For local development, testing, and contributing, see **[DEVELOPMENT.md](DEVELOP
 
 ```text
 src/mcp_logseq/
-├── server.py          # MCP server setup, tool registration, read-only/profile handling
-├── settings.py         # Environment/config-file settings loader
-├── access.py           # Namespace/tag access-control policy and enforcement
-├── namespace.py         # Namespace matching helpers
-├── parser.py           # Markdown <-> Logseq block parsing (file graphs)
-├── transport/          # HTTP transport (auth, streaming)
-├── vector/              # Optional semantic search (embedder, db, sync, index)
-├── bin/                 # logseq-sync CLI entry point
-├── logseq/              # LogSeq HTTP API client, split into mixins by area:
-│   ├── __init__.py         #   GRAPH_OPERATION_ROUTES, LogSeq class composition
-│   ├── pages.py            #   PageMixin  - page CRUD, namespaces, backlinks
-│   ├── blocks.py           #   BlockMixin - block CRUD, batch/nested insert
-│   ├── properties.py       #   PropertyMixin - DB properties, datascript queries
-│   ├── tags.py             #   TagMixin - DB tag/class operations
-│   └── search.py           #   SearchMixin - search, DSL query, upsert_nodes
-└── tools/                # MCP tool handlers, split by domain:
-    ├── __init__.py         #   Shared state, ToolHandler/_DBToolHandler bases, re-exports
-    ├── pages.py            #   Page tool handlers
-    ├── blocks.py            #   Block tool handlers
-    ├── search.py             #   search/query/find_pages_by_property
-    ├── db_native.py          #   upsert_nodes, get_page_data, list_tags/properties
-    ├── properties.py         #   DB property tool handlers
-    └── tags.py               #   DB tag tool handlers
+ server.py          # MCP server setup, tool registration, read-only/profile handling
+ settings.py         # Environment/config-file settings loader
+ access.py           # Namespace/tag access-control policy and enforcement
+ namespace.py         # Namespace matching helpers
+ parser.py           # Markdown <-> Logseq block parsing (file graphs)
+ transport/          # HTTP transport (auth, streaming)
+ vector/              # Optional semantic search (embedder, db, sync, index)
+ bin/                 # logseq-sync CLI entry point
+ logseq/              # LogSeq HTTP API client, split into mixins by area:
+    __init__.py         #   GRAPH_OPERATION_ROUTES, LogSeq class composition
+    pages.py            #   PageMixin  - page CRUD, namespaces, backlinks
+    blocks.py           #   BlockMixin - block CRUD, batch/nested insert
+    properties.py       #   PropertyMixin - DB properties, datascript queries
+    tags.py             #   TagMixin - DB tag/class operations
+    search.py           #   SearchMixin - search, DSL query, upsert_nodes
+ tools/                # MCP tool handlers, split by domain:
+     __init__.py         #   Shared state, ToolHandler/_DBToolHandler bases, re-exports
+     pages.py            #   Page tool handlers
+     blocks.py            #   Block tool handlers
+     search.py             #   search/query/find_pages_by_property
+     db_native.py          #   upsert_nodes, get_page_data, list_tags/properties
+     properties.py         #   DB property tool handlers
+     tags.py               #   DB tag tool handlers
 ```
 
 `logseq/` is the API client (one `LogSeq` class per graph mode); `tools/`
@@ -572,4 +572,4 @@ for the `logseq.Editor.*` (file graph) vs `logseq.cli.*`/`logseq.app.*`
 
 **Ready to supercharge your LogSeq workflow with AI?**
 
-⭐ **Star this repository** if you find it helpful.
+**Star this repository** if you find it helpful.

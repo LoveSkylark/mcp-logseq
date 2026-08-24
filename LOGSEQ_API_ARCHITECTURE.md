@@ -92,7 +92,7 @@ They are not instructions to call raw routes directly.
   verified the current DB mappings. The route manifest is the source of truth.
 - `logseq.cli.getPagesFromNamespace`/`logseq.cli.getPagesTreeFromNamespace` are
   not hangs but crash with a clean HTTP 500
-  (`Cannot read properties of undefined (reading 'apply')`) — not viable
+  (`Cannot read properties of undefined (reading 'apply')`) - not viable
   either way.
 
 Each hang above was independently confirmed responsive-server-otherwise:
@@ -164,14 +164,14 @@ Standard JSON-RPC response with result or error.
 
 ### Method Name Resolution
 - API methods follow pattern: `logseq.Namespace.methodName`
-- Converted to snake_case internally (e.g., `createPage` → `create_page`)
+- Converted to snake_case internally (e.g., `createPage`  `create_page`)
 - Special namespaces: `ui`, `git`, `assets` get `_` suffix
 
 ## Verified API Methods
 
 ### Editor Namespace (`logseq.Editor.*`)
 
-#### ✅ Implemented & Tested
+####  Implemented & Tested
 - **`createPage(pageName, properties, options)`**
   - Creates new page with optional properties
   - Options: `{createFirstBlock: true}` creates initial empty block
@@ -228,7 +228,7 @@ They are not the preferred bulk-operation path for DB graphs.
 - Bearer token stripped of "Bearer " prefix before validation
 
 ### Token Generation
-Generated in LogSeq Settings → Features → HTTP APIs server
+Generated in LogSeq Settings  Features  HTTP APIs server
 
 ## Error Handling
 
@@ -268,7 +268,7 @@ Generated in LogSeq Settings → Features → HTTP APIs server
 
 ### LogSeq Prerequisites
 1. LogSeq application running
-2. "Enable HTTP APIs server" checked in Settings → Features
+2. "Enable HTTP APIs server" checked in Settings  Features
 3. Valid API token generated
 
 ## Implementation Notes
@@ -311,17 +311,17 @@ Block hierarchy example:
 
 | Operation | Tool | Status |
 | --------- | ---- | ------ |
-| Read | `get_page_content` | ✅ |
-| Create | `insert_nested_block` | ✅ |
-| Delete | `delete_block` | ✅ |
-| Update | `update_block` | ✅ |
+| Read | `get_page_content` |  |
+| Create | `insert_nested_block` |  |
+| Delete | `delete_block` |  |
+| Update | `update_block` |  |
 
 ## Future Research Areas
-- **Graph context** (`logseq.App.getCurrentGraph`) — Expose which graph is active. Low effort, useful for multi-graph setups.
-- **Advanced property management** — Set block-level properties directly (`logseq.Editor.setBlockProperties`). Currently only page properties are writable.
-- ~~Asset/file operations via `logseq.Assets.*`~~ — Not useful for AI assistant context.
-- ~~UI interaction via `logseq.UI.*`~~ — UI automation from AI is fragile; not worth pursuing.
-- ~~Git operations via `logseq.Git.*`~~ — Too niche (requires Logseq's built-in git sync).
+- **Graph context** (`logseq.App.getCurrentGraph`) - Expose which graph is active. Low effort, useful for multi-graph setups.
+- **Advanced property management** - Set block-level properties directly (`logseq.Editor.setBlockProperties`). Currently only page properties are writable.
+- ~~Asset/file operations via `logseq.Assets.*`~~ - Not useful for AI assistant context.
+- ~~UI interaction via `logseq.UI.*`~~ - UI automation from AI is fragile; not worth pursuing.
+- ~~Git operations via `logseq.Git.*`~~ - Too niche (requires Logseq's built-in git sync).
 
 ---
 

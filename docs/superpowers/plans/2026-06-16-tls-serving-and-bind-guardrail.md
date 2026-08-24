@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Let `mcp-logseq --transport http` serve directly over TLS (so the bearer token and all content are encrypted on the wire), and refuse to bind a non-loopback interface over plain HTTP unless the operator explicitly opts in — so that publishing this tool does not hand downstream users a silent footgun.
+**Goal:** Let `mcp-logseq --transport http` serve directly over TLS (so the bearer token and all content are encrypted on the wire), and refuse to bind a non-loopback interface over plain HTTP unless the operator explicitly opts in - so that publishing this tool does not hand downstream users a silent footgun.
 
 **Architecture:** The HTTP transport already runs the MCP server through uvicorn (`run_http` in `src/mcp_logseq/transport/http.py`). uvicorn supports TLS natively via `ssl_certfile`/`ssl_keyfile`, so native TLS is a thin pass-through of two new CLI flags. Independently, a small validation step in the CLI entry point (`src/mcp_logseq/__init__.py`) classifies the bind host as loopback-or-not and refuses an unencrypted non-loopback bind unless `--insecure` is given. Both changes are additive and keep today's default (stdio, or plain HTTP on `127.0.0.1`) byte-for-byte unchanged. A TLS-terminating reverse proxy (e.g. Caddy) remains the recommended production path and is documented, not coded.
 
@@ -10,11 +10,11 @@
 
 ## Global Constraints
 
-- English only — all code, comments, docs, commit messages in English.
+- English only - all code, comments, docs, commit messages in English.
 - Loopback bind default (`--host 127.0.0.1`) is unchanged; never default to `0.0.0.0`.
 - `uvicorn` stays a lazy import inside `run_http` (the stdio path must not import it).
 - Backward compatibility: existing `run_http(host, port, auth_token, read_only=False)` callers and the stdio path must keep working; new parameters default to "off" (`tls_cert=None`, `tls_key=None`, `insecure=False`) so current behavior is identical.
-- No new runtime dependencies — uvicorn already ships TLS support via its `standard`/stdlib `ssl` path.
+- No new runtime dependencies - uvicorn already ships TLS support via its `standard`/stdlib `ssl` path.
 - Tests run with `LOGSEQ_API_TOKEN=test-token` in the environment (the suite imports `tools.py`, which raises at import without it). For the full suite also run `uv sync --extra vector` first.
 
 ---
@@ -24,8 +24,8 @@
 Confirmed in the current tree:
 
 - `src/mcp_logseq/__init__.py`: `parse_args(argv=None)` (argparse with `--transport`/`--host`/`--port`/`--read-only`) and `main()` which, on the http path, requires `MCP_HTTP_AUTH_TOKEN` then calls `http.run_http(args.host, args.port, token, read_only=args.read_only)`.
-- `src/mcp_logseq/transport/http.py`: `run_http(host, port, auth_token, read_only=False)` → `uvicorn.run(create_asgi_app(...), host=host, port=port)` with uvicorn imported lazily.
-- `tests/unit/test_cli.py`: existing CLI tests (parse_args defaults, http-without-token SystemExit, run_http call-through via monkeypatch). Mirror these patterns — do NOT introduce a new test style.
+- `src/mcp_logseq/transport/http.py`: `run_http(host, port, auth_token, read_only=False)`  `uvicorn.run(create_asgi_app(...), host=host, port=port)` with uvicorn imported lazily.
+- `tests/unit/test_cli.py`: existing CLI tests (parse_args defaults, http-without-token SystemExit, run_http call-through via monkeypatch). Mirror these patterns - do NOT introduce a new test style.
 
 This plan only adds flags, a validation helper, and a uvicorn pass-through. It does not touch the ASGI app, auth middleware, or ACL layer.
 
@@ -33,18 +33,18 @@ This plan only adds flags, a validation helper, and a uvicorn pass-through. It d
 
 ## File Structure
 
-- Modify: `src/mcp_logseq/transport/http.py` — `run_http` accepts `tls_cert`/`tls_key`, passes `ssl_certfile`/`ssl_keyfile` to `uvicorn.run`.
-- Modify: `src/mcp_logseq/__init__.py` — add `--tls-cert`/`--tls-key`/`--insecure` to `parse_args`; add a testable `_validate_http_options(args)` helper; call it and thread TLS into `run_http` from `main()`.
-- Modify: `tests/unit/test_cli.py` — extend with TLS pass-through, both-or-neither, and bind-guardrail tests.
-- Modify: `README.md` — TLS section (native flags + reverse-proxy), and an explicit "encrypt anything past loopback" warning.
+- Modify: `src/mcp_logseq/transport/http.py` - `run_http` accepts `tls_cert`/`tls_key`, passes `ssl_certfile`/`ssl_keyfile` to `uvicorn.run`.
+- Modify: `src/mcp_logseq/__init__.py` - add `--tls-cert`/`--tls-key`/`--insecure` to `parse_args`; add a testable `_validate_http_options(args)` helper; call it and thread TLS into `run_http` from `main()`.
+- Modify: `tests/unit/test_cli.py` - extend with TLS pass-through, both-or-neither, and bind-guardrail tests.
+- Modify: `README.md` - TLS section (native flags + reverse-proxy), and an explicit "encrypt anything past loopback" warning.
 
 ---
 
 ## Resolved Decisions
 
-- **[DECIDE-A] TLS mechanism — RESOLVED: native uvicorn `ssl_certfile`/`ssl_keyfile`, plus documented reverse-proxy option.** Native TLS makes the tool self-sufficient for host-internal/self-signed encryption; a reverse proxy (Caddy, automatic Let's Encrypt) is the recommended internet-facing path and is documented in Task 3, not coded. *Tasks 1 & 3.*
-- **[DECIDE-B] Insecure-bind posture — RESOLVED: explicit `--insecure` opt-in (refuse, do not merely warn).** Binding a non-loopback host over plain HTTP raises `SystemExit` unless `--insecure` is passed. A hard refuse-with-override beats a silent warning (warnings scroll past in service logs) and beats a blanket refusal (which would break the legitimate "plain HTTP behind a TLS proxy on a private interface" setup — the operator passes `--insecure` consciously there). Loopback bind over plain HTTP needs no opt-in. TLS-configured bind on any host needs no opt-in. *Task 2.* (Veto-able: if you prefer a loud warning over a hard refuse, that is the only knob to flip.)
-- **[DECIDE-C] Loopback classification — RESOLVED: host in `{"127.0.0.1", "::1", "localhost"}` is loopback; everything else is "exposed".** This is a deliberately simple, conservative set: an operator who binds `127.0.0.2` (still loopback range) is treated as exposed and must pass TLS or `--insecure` — erring toward asking for explicit intent rather than guessing. Documented as such. *Task 2.*
+- **[DECIDE-A] TLS mechanism - RESOLVED: native uvicorn `ssl_certfile`/`ssl_keyfile`, plus documented reverse-proxy option.** Native TLS makes the tool self-sufficient for host-internal/self-signed encryption; a reverse proxy (Caddy, automatic Let's Encrypt) is the recommended internet-facing path and is documented in Task 3, not coded. *Tasks 1 & 3.*
+- **[DECIDE-B] Insecure-bind posture - RESOLVED: explicit `--insecure` opt-in (refuse, do not merely warn).** Binding a non-loopback host over plain HTTP raises `SystemExit` unless `--insecure` is passed. A hard refuse-with-override beats a silent warning (warnings scroll past in service logs) and beats a blanket refusal (which would break the legitimate "plain HTTP behind a TLS proxy on a private interface" setup - the operator passes `--insecure` consciously there). Loopback bind over plain HTTP needs no opt-in. TLS-configured bind on any host needs no opt-in. *Task 2.* (Veto-able: if you prefer a loud warning over a hard refuse, that is the only knob to flip.)
+- **[DECIDE-C] Loopback classification - RESOLVED: host in `{"127.0.0.1", "::1", "localhost"}` is loopback; everything else is "exposed".** This is a deliberately simple, conservative set: an operator who binds `127.0.0.2` (still loopback range) is treated as exposed and must pass TLS or `--insecure` - erring toward asking for explicit intent rather than guessing. Documented as such. *Task 2.*
 
 ---
 
@@ -155,7 +155,7 @@ def _validate_http_options(args) -> None:
                 raise SystemExit(f"{label} file not found: {path}")
 ```
 
-- [ ] **Step 4: Thread TLS through `main()`** — update the http branch in `src/mcp_logseq/__init__.py`
+- [ ] **Step 4: Thread TLS through `main()`** - update the http branch in `src/mcp_logseq/__init__.py`
 
 ```python
     else:
@@ -206,7 +206,7 @@ def run_http(
 - [ ] **Step 6: Run to verify pass**
 
 Run: `LOGSEQ_API_TOKEN=test-token uv run pytest tests/unit/test_cli.py -v`
-Expected: PASS (all new tests). Then full suite: `LOGSEQ_API_TOKEN=test-token uv sync --extra vector && LOGSEQ_API_TOKEN=test-token uv run pytest --tb=short` — Expected: PASS, no regression.
+Expected: PASS (all new tests). Then full suite: `LOGSEQ_API_TOKEN=test-token uv sync --extra vector && LOGSEQ_API_TOKEN=test-token uv run pytest --tb=short` - Expected: PASS, no regression.
 
 - [ ] **Step 7: Commit**
 
@@ -285,13 +285,13 @@ Expected: FAIL (`insecure` attribute missing / no guardrail raise).
         action="store_true",
         help=(
             "Allow binding a non-loopback host over plain HTTP. Without TLS the "
-            "bearer token and all content travel unencrypted — only use on a "
+            "bearer token and all content travel unencrypted - only use on a "
             "trusted network or behind a TLS-terminating reverse proxy."
         ),
     )
 ```
 
-- [ ] **Step 4: Extend `_validate_http_options`** — add the guardrail after the TLS-file checks from Task 1
+- [ ] **Step 4: Extend `_validate_http_options`** - add the guardrail after the TLS-file checks from Task 1
 
 ```python
     _LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
@@ -311,7 +311,7 @@ Define `_LOOPBACK_HOSTS` at module level (top of `__init__.py`) rather than insi
 - [ ] **Step 5: Run to verify pass**
 
 Run: `LOGSEQ_API_TOKEN=test-token uv run pytest tests/unit/test_cli.py -v`
-Expected: PASS. Then full suite: `LOGSEQ_API_TOKEN=test-token uv run pytest --tb=short` — Expected: PASS, no regression. Also smoke-test the default still works: `LOGSEQ_API_TOKEN=test-token MCP_HTTP_AUTH_TOKEN=x` is NOT needed here — instead assert via the tests above; do not start a real server.
+Expected: PASS. Then full suite: `LOGSEQ_API_TOKEN=test-token uv run pytest --tb=short` - Expected: PASS, no regression. Also smoke-test the default still works: `LOGSEQ_API_TOKEN=test-token MCP_HTTP_AUTH_TOKEN=x` is NOT needed here - instead assert via the tests above; do not start a real server.
 
 - [ ] **Step 6: Commit**
 
@@ -336,7 +336,7 @@ git commit -m "feat(cli): refuse non-loopback plain-HTTP bind without --insecure
   - Recommended production path: a reverse proxy (Caddy with automatic HTTPS) terminating TLS in front of a loopback-bound `mcp-logseq`. Show a minimal Caddy example:
 
 ````markdown
-# Caddyfile — automatic HTTPS in front of a loopback-bound instance
+# Caddyfile - automatic HTTPS in front of a loopback-bound instance
 logseq.example.com {
     reverse_proxy 127.0.0.1:12320
 }
@@ -359,7 +359,7 @@ git commit -m "docs: TLS serving, reverse-proxy guidance, insecure-bind guardrai
 
 - All new flags default to off; `parse_args([])` and the stdio path are unchanged.
 - `run_http`'s new `tls_cert`/`tls_key` default to `None`, so `uvicorn.run(..., ssl_certfile=None, ssl_keyfile=None)` is exactly today's plain-HTTP behavior; existing callers pass nothing new.
-- A plain `--transport http --port N` on the default loopback host still starts with no TLS and no opt-in required — only non-loopback binds change behavior.
+- A plain `--transport http --port N` on the default loopback host still starts with no TLS and no opt-in required - only non-loopback binds change behavior.
 
 ## Self-Review Notes
 

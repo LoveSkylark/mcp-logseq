@@ -10,14 +10,14 @@ The testing framework is built using pytest and provides comprehensive coverage 
 
 ```
 tests/
-├── conftest.py
-├── unit/                      # API, handlers, access, parser, and vector tests
-└── integration/               # MCP/HTTP tests and live DB harnesses
-    ├── test_mcp_server.py
-    ├── test_http_serving.py
-    ├── test-logseq-db-api.ps1  # Live Logseq 2.x API lab
-    ├── test-db-editor-mutations.ps1
-    └── export-db-route-manifest.py
+ conftest.py
+ unit/                      # API, handlers, access, parser, and vector tests
+ integration/               # MCP/HTTP tests and live DB harnesses
+     test_mcp_server.py
+     test_http_serving.py
+     test-logseq-db-api.ps1  # Live Logseq 2.x API lab
+     test-db-editor-mutations.ps1
+     export-db-route-manifest.py
 ```
 
 ## Dependencies

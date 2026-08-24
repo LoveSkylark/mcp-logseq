@@ -1,10 +1,10 @@
-# Namespace Bazlı Erişim Kontrolü — Implementation Plan
+# Namespace Bazlı Erişim Kontrolü - Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** mcp-logseq sunucusuna, mevcut tag bazlı `exclude_tags` mekanizmasıyla yan yana çalışan, namespace bazlı include/exclude erişim kontrolü eklemek; tüm okuma, yazma/silme ve vektör arama araçlarında uygulamak.
 
-**Architecture:** Config katmanına `exclude_tags` ile simetrik iki yükleyici (`load_include_namespaces`, `load_exclude_namespaces`) eklenir; ortak bir `_load_csv_config` helper'ı çıkarılır. `tools.py` içine saf eşleştirme fonksiyonları (`_namespace_matches`, `_is_namespace_blocked`) ve enforcement helper'ları (`_enforce_namespace_access`, `_enforce_block_namespace_access`, `AccessDenied`) eklenir. Sayfa adı taşıyan araçlar pre-flight kontrol yapar; block-UUID araçları block→sayfa adını API'den çözüp kontrol eder; liste/arama/vektör araçları sonuç setini sessizce filtreler.
+**Architecture:** Config katmanına `exclude_tags` ile simetrik iki yükleyici (`load_include_namespaces`, `load_exclude_namespaces`) eklenir; ortak bir `_load_csv_config` helper'ı çıkarılır. `tools.py` içine saf eşleştirme fonksiyonları (`_namespace_matches`, `_is_namespace_blocked`) ve enforcement helper'ları (`_enforce_namespace_access`, `_enforce_block_namespace_access`, `AccessDenied`) eklenir. Sayfa adı taşıyan araçlar pre-flight kontrol yapar; block-UUID araçları blocksayfa adını API'den çözüp kontrol eder; liste/arama/vektör araçları sonuç setini sessizce filtreler.
 
 **Tech Stack:** Python 3, `uv`, `pytest`, `unittest.mock`. Logseq HTTP JSON-RPC API.
 
@@ -12,9 +12,9 @@
 
 ## Tasarım kuralları (spec'ten)
 
-- **Eşleştirme:** segment bazlı, case-insensitive. `work` → `work` ve `work/...` eşleşir; `workshop` eşleşmez.
+- **Eşleştirme:** segment bazlı, case-insensitive. `work`  `work` ve `work/...` eşleşir; `workshop` eşleşmez.
 - **Öncelik:** exclude kazanır. Sonra: include doluysa ve hiçbirine uymuyorsa engelle (katı allow-list; namespace'siz sayfalar da gizlenir).
-- **Katmanlar:** tag (mevcut) VEYA namespace (yeni) → engelle.
+- **Katmanlar:** tag (mevcut) VEYA namespace (yeni)  engelle.
 - **Görünürlük:** liste/arama/vektör sessiz filtre; doğrudan erişim/yazma/silme `AccessDenied` ile sert hata.
 - **Block araçları (fail-closed):** namespace kuralı tanımlıyken block'un sayfası çözülemezse erişim reddedilir. Hiç namespace kuralı yoksa özellik kapalıdır, hiçbir şey değişmez.
 - **Sınır:** Yazma araçlarında yalnızca **namespace** (isim bazlı) zorlanır; tag bazlı kontrol mevcut okuma noktalarında olduğu gibi kalır (tag için sayfa property'leri gerekir; bu özelliğin kapsamı namespace'tir).
@@ -23,12 +23,12 @@
 
 ## Dosya yapısı
 
-- **Modify** `src/mcp_logseq/config.py` — `_load_csv_config` helper, `load_include_namespaces`, `load_exclude_namespaces`; `load_exclude_tags` refactor; docstring güncelle.
-- **Modify** `src/mcp_logseq/logseq.py` — `get_block_page_name`, `_get_page_name_by_id` API helper'ları.
-- **Modify** `src/mcp_logseq/tools.py` — eşleştirme + enforcement helper'ları; modül seviyesi config; tüm ilgili handler'lara enforcement/filtreleme.
-- **Modify** `src/mcp_logseq/vector/index.py` — vektör arama sonuç filtresi.
-- **Create** `tests/unit/test_namespace_access.py` — tüm yeni birim ve handler testleri.
-- **Modify** `tests/unit/test_logseq_api.py` — `get_block_page_name` testleri (mevcut API test dosyasıyla aynı yerde).
+- **Modify** `src/mcp_logseq/config.py` - `_load_csv_config` helper, `load_include_namespaces`, `load_exclude_namespaces`; `load_exclude_tags` refactor; docstring güncelle.
+- **Modify** `src/mcp_logseq/logseq.py` - `get_block_page_name`, `_get_page_name_by_id` API helper'ları.
+- **Modify** `src/mcp_logseq/tools.py` - eşleştirme + enforcement helper'ları; modül seviyesi config; tüm ilgili handler'lara enforcement/filtreleme.
+- **Modify** `src/mcp_logseq/vector/index.py` - vektör arama sonuç filtresi.
+- **Create** `tests/unit/test_namespace_access.py` - tüm yeni birim ve handler testleri.
+- **Modify** `tests/unit/test_logseq_api.py` - `get_block_page_name` testleri (mevcut API test dosyasıyla aynı yerde).
 
 ---
 
@@ -127,7 +127,7 @@ def test_exclude_tags_still_works_after_refactor(monkeypatch):
 - [ ] **Step 2: Testin başarısız olduğunu doğrula**
 
 Run: `uv run pytest tests/unit/test_namespace_access.py -v`
-Expected: FAIL — `ImportError: cannot import name 'load_include_namespaces'`
+Expected: FAIL - `ImportError: cannot import name 'load_include_namespaces'`
 
 - [ ] **Step 3: `_load_csv_config` helper'ını ekle ve `load_exclude_tags`'i ona bağla**
 
@@ -302,7 +302,7 @@ def test_is_page_blocked_false_when_clear(monkeypatch):
 - [ ] **Step 2: Testin başarısız olduğunu doğrula**
 
 Run: `uv run pytest tests/unit/test_namespace_access.py -k "namespace or page_blocked or allowlist or exclude_wins" -v`
-Expected: FAIL — `ImportError: cannot import name '_namespace_matches'`
+Expected: FAIL - `ImportError: cannot import name '_namespace_matches'`
 
 - [ ] **Step 3: Helper'ları implement et**
 
@@ -358,7 +358,7 @@ def _is_page_blocked(page: dict | None, page_name: str) -> bool:
 def _enforce_namespace_access(page_name: str) -> None:
     """Raise AccessDenied if page_name is blocked by namespace rules.
 
-    Name-based only (no tag check — that needs fetched page properties).
+    Name-based only (no tag check - that needs fetched page properties).
     """
     if _is_namespace_blocked(page_name, _include_namespaces, _exclude_namespaces):
         raise AccessDenied(
@@ -397,7 +397,7 @@ git commit -m "feat: add namespace matching and enforcement helpers"
 
 ---
 
-## Task 3: Block→sayfa adı çözümü (`logseq.py`)
+## Task 3: Blocksayfa adı çözümü (`logseq.py`)
 
 **Files:**
 - Modify: `src/mcp_logseq/logseq.py` (`get_block` tanımından sonra, satır ~1092)
@@ -405,7 +405,7 @@ git commit -m "feat: add namespace matching and enforcement helpers"
 
 - [ ] **Step 1: Failing testleri yaz**
 
-`tests/unit/test_logseq_api.py` sonuna ekle (dosya başındaki mevcut `from mcp_logseq.logseq import LogSeq` ve `unittest.mock` importlarını kullanır — yoksa ekle):
+`tests/unit/test_logseq_api.py` sonuna ekle (dosya başındaki mevcut `from mcp_logseq.logseq import LogSeq` ve `unittest.mock` importlarını kullanır - yoksa ekle):
 
 ```python
 from unittest.mock import patch, Mock
@@ -442,12 +442,12 @@ def test_get_block_page_name_none_when_block_missing():
         assert api.get_block_page_name("uuid-4") is None
 ```
 
-Not: `LogSeq.__init__` imzasını doğrula. Eğer parametre adı farklıysa (`api_base_url` yerine başka), `_api()` çağrısını gerçek imzaya göre düzelt — `grep -n "def __init__" src/mcp_logseq/logseq.py`.
+Not: `LogSeq.__init__` imzasını doğrula. Eğer parametre adı farklıysa (`api_base_url` yerine başka), `_api()` çağrısını gerçek imzaya göre düzelt - `grep -n "def __init__" src/mcp_logseq/logseq.py`.
 
 - [ ] **Step 2: Testin başarısız olduğunu doğrula**
 
 Run: `uv run pytest tests/unit/test_logseq_api.py -k get_block_page_name -v`
-Expected: FAIL — `AttributeError: 'LogSeq' object has no attribute 'get_block_page_name'`
+Expected: FAIL - `AttributeError: 'LogSeq' object has no attribute 'get_block_page_name'`
 
 - [ ] **Step 3: API helper'larını implement et**
 
@@ -576,12 +576,12 @@ def test_get_pages_tree_from_namespace_denies():
 Run: `uv run pytest tests/unit/test_namespace_access.py -k "get_page_content_denies or backlinks_denies or from_namespace_denies or tree_from_namespace" -v`
 Expected: FAIL (henüz enforcement yok; raise olmaz)
 
-- [ ] **Step 3a: `get_page_content` — mevcut tag kontrolünü namespace ile birleştir**
+- [ ] **Step 3a: `get_page_content` - mevcut tag kontrolünü namespace ile birleştir**
 
 `src/mcp_logseq/tools.py` satır ~444-449'u şununla değiştir:
 
 ```python
-            # Security: block access to restricted pages (tag OR namespace) — fail loudly
+            # Security: block access to restricted pages (tag OR namespace) - fail loudly
             if _is_page_blocked(result.get("page", {}), args["page_name"]):
                 raise AccessDenied(
                     f"Access denied: page '{args['page_name']}' is restricted "
@@ -589,7 +589,7 @@ Expected: FAIL (henüz enforcement yok; raise olmaz)
                 )
 ```
 
-- [ ] **Step 3b: `get_page_backlinks` — pre-flight enforcement ekle**
+- [ ] **Step 3b: `get_page_backlinks` - pre-flight enforcement ekle**
 
 `src/mcp_logseq/tools.py` satır ~1662 civarı, `page_name = args["page_name"]` satırından hemen sonra (try bloğundan önce ya da api oluşturmadan önce) ekle:
 
@@ -598,7 +598,7 @@ Expected: FAIL (henüz enforcement yok; raise olmaz)
         _enforce_namespace_access(page_name)
 ```
 
-- [ ] **Step 3c: `get_pages_from_namespace` ve `get_pages_tree_from_namespace` — namespace arg'ını kontrol et**
+- [ ] **Step 3c: `get_pages_from_namespace` ve `get_pages_tree_from_namespace` - namespace arg'ını kontrol et**
 
 `GetPagesFromNamespaceToolHandler.run_tool` içinde, `api = _make_api()` çağrısından önce ekle:
 
@@ -736,7 +736,7 @@ git commit -m "feat: enforce namespace access on page write/delete tools"
 
 ## Task 6: Block-UUID araçlarında enforcement
 
-Kapsam: `get_block`, `update_block`, `delete_block`, `insert_nested_block`, `set_block_properties`. Her biri `api = _make_api()` sonrası `_enforce_block_namespace_access(api, <uuid>)` çağırır; `AccessDenied` sert hata olarak yükselmeli (generic `except Exception`'a yakalanıp `❌` mesajına dönüşmemeli), bu yüzden her handler'ın generic except'inden ÖNCE `except AccessDenied: raise` eklenir.
+Kapsam: `get_block`, `update_block`, `delete_block`, `insert_nested_block`, `set_block_properties`. Her biri `api = _make_api()` sonrası `_enforce_block_namespace_access(api, <uuid>)` çağırır; `AccessDenied` sert hata olarak yükselmeli (generic `except Exception`'a yakalanıp `` mesajına dönüşmemeli), bu yüzden her handler'ın generic except'inden ÖNCE `except AccessDenied: raise` eklenir.
 
 **Files:**
 - Modify: `src/mcp_logseq/tools.py`
@@ -821,17 +821,17 @@ Expected: FAIL
 
             return [TextContent(
                 type="text",
-                text=f"✅ Successfully deleted block '{block_uuid}'"
+                text=f" Successfully deleted block '{block_uuid}'"
             )]
         except AccessDenied:
             raise
         except ValueError as e:
-            return [TextContent(type="text", text=f"❌ Error: {str(e)}")]
+            return [TextContent(type="text", text=f" Error: {str(e)}")]
         except Exception as e:
             logger.error(f"Failed to delete block: {str(e)}")
             return [TextContent(
                 type="text",
-                text=f"❌ Failed to delete block '{block_uuid}': {str(e)}"
+                text=f" Failed to delete block '{block_uuid}': {str(e)}"
             )]
 ```
 
@@ -847,17 +847,17 @@ Expected: FAIL
 
             return [TextContent(
                 type="text",
-                text=f"✅ Successfully updated block '{block_uuid}'"
+                text=f" Successfully updated block '{block_uuid}'"
             )]
         except AccessDenied:
             raise
         except ValueError as e:
-            return [TextContent(type="text", text=f"❌ Error: {str(e)}")]
+            return [TextContent(type="text", text=f" Error: {str(e)}")]
         except Exception as e:
             logger.error(f"Failed to update block: {str(e)}")
             return [TextContent(
                 type="text",
-                text=f"❌ Failed to update block '{block_uuid}': {str(e)}"
+                text=f" Failed to update block '{block_uuid}': {str(e)}"
             )]
 ```
 
@@ -903,7 +903,7 @@ ve except zincirine:
         except AccessDenied:
             raise
         except ValueError as e:
-            return [TextContent(type="text", text=f"❌ Error: {str(e)}")]
+            return [TextContent(type="text", text=f" Error: {str(e)}")]
 ```
 
 - [ ] **Step 3e: `set_block_properties`**
@@ -1024,7 +1024,7 @@ Expected: FAIL
                     continue
 ```
 
-- [ ] **Step 3b: `search` — `_build_excluded_page_names` genişlet**
+- [ ] **Step 3b: `search` - `_build_excluded_page_names` genişlet**
 
 `src/mcp_logseq/tools.py` satır ~916-935'teki staticmethod'u değiştir:
 
@@ -1150,7 +1150,7 @@ def test_vector_results_filtered_by_namespace():
 - [ ] **Step 2: Testin başarısız olduğunu doğrula**
 
 Run: `uv run pytest tests/unit/test_namespace_access.py -k vector_results -v`
-Expected: FAIL — `ImportError: cannot import name '_filter_results_by_namespace'`
+Expected: FAIL - `ImportError: cannot import name '_filter_results_by_namespace'`
 
 - [ ] **Step 3: Filtreyi implement et ve aramaya bağla**
 
@@ -1238,7 +1238,7 @@ git commit -m "docs: document namespace access control config"
 
 ## Self-Review (yazarken yapıldı)
 
-- **Spec coverage:** Config (Task 1), eşleştirme+öncelik+katmanlar (Task 2), block→page çözümü (Task 3), tüm A-grubu okuma (Task 4) ve yazma/silme (Task 5) araçları, B-grubu block araçları fail-closed (Task 6), C-grubu liste/arama/query/property filtreleme (Task 7), vektör (Task 8). Tüm spec maddeleri bir task'a bağlı.
+- **Spec coverage:** Config (Task 1), eşleştirme+öncelik+katmanlar (Task 2), blockpage çözümü (Task 3), tüm A-grubu okuma (Task 4) ve yazma/silme (Task 5) araçları, B-grubu block araçları fail-closed (Task 6), C-grubu liste/arama/query/property filtreleme (Task 7), vektör (Task 8). Tüm spec maddeleri bir task'a bağlı.
 - **Placeholder taraması:** Yok; her kod adımı tam kod içeriyor.
 - **Tip/imza tutarlılığı:** `_namespace_matches`, `_is_namespace_blocked`, `_is_page_blocked`, `_enforce_namespace_access`, `_enforce_block_namespace_access`, `AccessDenied`, `get_block_page_name`, `_get_page_name_by_id`, `_filter_results_by_namespace` adları tüm task'larda tutarlı. `_build_excluded_page_names` yeni imzası (Task 7) hem implementasyon hem testte aynı sırada (`api, exclude_tags, exclude_namespaces, include_namespaces`).
 - **Doğrulanan gerçek detaylar:** `rename_page` argümanları `old_name`/`new_name`; `insert_nested_block` argümanı `parent_block_uuid`; vektör sonucu `SearchResult.page`; `vector/index.py` zaten `from mcp_logseq.tools import ToolHandler` yapıyor (döngüsel import yok).

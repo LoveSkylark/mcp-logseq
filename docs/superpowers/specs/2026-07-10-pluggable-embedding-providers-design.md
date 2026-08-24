@@ -12,9 +12,9 @@ adapters rather than changing the sync and search code.
 
 The first increment supports three provider values:
 
-- `ollama` — the existing local `POST /api/embed` integration.
-- `openai` — OpenAI's hosted `POST /v1/embeddings` API.
-- `openai-compatible` — any service exposing the same request and response
+- `ollama` - the existing local `POST /api/embed` integration.
+- `openai` - OpenAI's hosted `POST /v1/embeddings` API.
+- `openai-compatible` - any service exposing the same request and response
   shape, with a configurable base URL and optional bearer token.
 
 ## Decisions

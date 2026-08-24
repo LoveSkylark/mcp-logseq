@@ -1,6 +1,6 @@
 # Vector Search Setup Guide
 
-Semantic search over your Logseq graph using local or hosted AI embeddings. Find notes by meaning rather than exact keywords — works across languages and concepts.
+Semantic search over your Logseq graph using local or hosted AI embeddings. Find notes by meaning rather than exact keywords - works across languages and concepts.
 
 ## Architecture
 
@@ -27,7 +27,7 @@ the provider's data-handling policy before enabling a hosted service.
 Install Ollama from [ollama.com](https://ollama.com) and pull an embedding model:
 
 ```bash
-ollama pull qwen3-embedding:8b   # recommended — high quality, 4096 dims
+ollama pull qwen3-embedding:8b   # recommended - high quality, 4096 dims
 # or
 ollama pull nomic-embed-text     # lighter alternative
 ```
@@ -130,8 +130,8 @@ This keeps everything in one place:
 
 ```text
 ~/.logseq-vector/
-  config.json   ← you edit this
-  db/           ← generated, do not edit
+  config.json    you edit this
+  db/            generated, do not edit
 ```
 
 ### Logseq 2.x DB graphs
@@ -152,21 +152,21 @@ LOGSEQ_DB_MODE=auto logseq-sync --rebuild
 
 | Field | Required | Description |
 | --- | --- | --- |
-| `logseq_graph_path` | ✅ | Path to a file graph directory, or the configured graph path used for DB-mode status reporting |
-| `exclude_tags` | no | **Project-level privacy filter** — pages with these tags are hidden from all tools (list, search, query, get content) *and* excluded from the vector index. Use this for pages with sensitive content (e.g. API keys, personal notes). |
-| `vector.enabled` | ✅ | Must be `true` to activate vector tools |
-| `vector.db_path` | ✅ | Where to store the vector DB — keep it local, not in iCloud |
+| `logseq_graph_path` |  | Path to a file graph directory, or the configured graph path used for DB-mode status reporting |
+| `exclude_tags` | no | **Project-level privacy filter** - pages with these tags are hidden from all tools (list, search, query, get content) *and* excluded from the vector index. Use this for pages with sensitive content (e.g. API keys, personal notes). |
+| `vector.enabled` |  | Must be `true` to activate vector tools |
+| `vector.db_path` |  | Where to store the vector DB - keep it local, not in iCloud |
 | `vector.embedder.provider` | no | `ollama` (default), `openai`, or `openai-compatible` |
 | `vector.embedder.model` | provider-dependent | Defaults to `nomic-embed-text` for Ollama and `text-embedding-3-small` for OpenAI; required for `openai-compatible` |
 | `vector.embedder.base_url` | provider-dependent | Defaults to local Ollama or OpenAI's API root; required for `openai-compatible` |
 | `vector.embedder.api_key` | provider-dependent | Required for OpenAI; optional bearer token for `openai-compatible`; ignored by Ollama |
 | `vector.embedder.dimensions` | no | Positive integer requested from an OpenAI-compatible endpoint; changing it requires a rebuild |
 | `vector.include_journals` | no | Index journal pages (default: `true`) |
-| `vector.exclude_tags` | no | Additional tags to skip from the vector index only (additive with top-level `exclude_tags`). Use for noise filtering — e.g. large reference dumps that pollute semantic search but are fine to read directly. (default: `[]`) |
+| `vector.exclude_tags` | no | Additional tags to skip from the vector index only (additive with top-level `exclude_tags`). Use for noise filtering - e.g. large reference dumps that pollute semantic search but are fine to read directly. (default: `[]`) |
 | `vector.min_chunk_length` | no | Minimum characters per chunk (default: `50`) |
 | `LOGSEQ_DB_MODE` | no | Defaults to `auto`; set to `true` for Logseq 2.x DB graphs or `false` for legacy Markdown/file graphs |
 
-**Important:** keep `db_path` outside your iCloud-synced Logseq folder. The DB is a generated binary artifact — syncing it to iCloud wastes bandwidth and can cause corruption.
+**Important:** keep `db_path` outside your iCloud-synced Logseq folder. The DB is a generated binary artifact - syncing it to iCloud wastes bandwidth and can cause corruption.
 
 If `config.json` contains an API key, do not commit or share it. Restrict it to
 your user account, for example with `chmod 600 ~/.logseq-vector/config.json`.
@@ -234,7 +234,7 @@ uv run --with ".[vector]" python -m mcp_logseq.bin.logseq_sync --status
 
 ## Talking to Claude
 
-These tools are called by Claude on your behalf — you don't invoke them directly. Just talk naturally:
+These tools are called by Claude on your behalf - you don't invoke them directly. Just talk naturally:
 
 ```
 "Find my notes about shadow work or Jung"
@@ -260,8 +260,8 @@ Semantic search across your notes. Claude calls this when you ask it to find not
 | `query` | string | required | Natural language query |
 | `top_k` | integer | 5 | Number of results (max 20) |
 | `search_mode` | string | `hybrid` | `hybrid`, `vector`, or `keyword` |
-| `filter_tags` | array | — | Only return pages with ALL these tags |
-| `filter_page` | string | — | Restrict to a single page |
+| `filter_tags` | array | - | Only return pages with ALL these tags |
+| `filter_page` | string | - | Restrict to a single page |
 
 **Sync ownership:** `vector_search` is read-only and does not start a sync. Run
 the external `logseq-sync` writer on the host that owns the graph and vector DB.
@@ -298,7 +298,7 @@ Vector DB Status
 
 ## CLI: `logseq-sync`
 
-For syncing outside of the MCP server — useful for initial indexing, automation, or continuous watch mode.
+For syncing outside of the MCP server - useful for initial indexing, automation, or continuous watch mode.
 
 ```bash
 export LOGSEQ_CONFIG_FILE=~/.logseq-vector/config.json

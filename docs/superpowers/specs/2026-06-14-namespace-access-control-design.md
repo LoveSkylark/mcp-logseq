@@ -1,4 +1,4 @@
-# Namespace Bazlı Erişim Kontrolü — Tasarım
+# Namespace Bazlı Erişim Kontrolü - Tasarım
 
 **Tarih:** 2026-06-14
 **Durum:** Onaylandı (uygulama planı bekliyor)
@@ -18,14 +18,14 @@ whitelist (allow-list) yok.
 
 1. **Erişim modeli:** Hem `include_namespaces` (allow-list) hem
    `exclude_namespaces` (deny-list) desteklenir.
-2. **Eşleştirme:** Segment bazlı. `work` → `work` ve `work/...` eşleşir;
+2. **Eşleştirme:** Segment bazlı. `work`  `work` ve `work/...` eşleşir;
    `workshop` eşleşmez. Case-insensitive (Logseq sayfa adları zaten böyle).
 3. **Öncelik:** Exclude kazanır. Önce include ile daralt, sonra exclude ile
    delik aç.
-4. **Kapsam:** Tüm araçlar — okuma, yazma/silme ve vektör arama.
+4. **Kapsam:** Tüm araçlar - okuma, yazma/silme ve vektör arama.
 5. **Namespace'siz sayfalar:** Katı allow-list. `include_namespaces` ayarlıysa,
    namespace'i olmayan üst seviye sayfalar da gizlenir (gerçek izolasyon).
-6. **Config yüzeyi:** `exclude_tags` ile simetrik — env değişkeni veya config
+6. **Config yüzeyi:** `exclude_tags` ile simetrik - env değişkeni veya config
    dosyası kök anahtarı. Öncelik: env > config > boş.
 7. **Tag ile ilişki:** Bağımsız katmanlar, mantıksal VEYA ile engelleme. Bir
    sayfa ya tag'inden ya namespace'inden dolayı bloklanabilir.
@@ -51,7 +51,7 @@ def _load_csv_config(env_var: str, config_key: str) -> list[str]:
 ```
 
 `load_exclude_tags()` bu helper'a `("LOGSEQ_EXCLUDE_TAGS", "exclude_tags")` ile
-delege eder — küçük, odaklı refactor; davranışı değişmez.
+delege eder - küçük, odaklı refactor; davranışı değişmez.
 
 Örnek config:
 
@@ -103,7 +103,7 @@ def _is_page_blocked(page: dict | None, page_name: str) -> bool:
 
 **Nüans:** Tag kontrolü sayfanın fetch edilmiş property'lerini gerektirir;
 namespace kontrolü sadece sayfa adından çalışır. Bu yüzden namespace filtresi
-daha ucuzdur ve içerik çekilmeden uygulanabilir — `list_pages` gibi yerlerde
+daha ucuzdur ve içerik çekilmeden uygulanabilir - `list_pages` gibi yerlerde
 önce isimden eleyip gereksiz fetch'ten kaçınılır.
 
 ## 3. Tool entegrasyon noktaları
@@ -124,15 +124,15 @@ daha ucuzdur ve içerik çekilmeden uygulanabilir — `list_pages` gibi yerlerde
 `rename_page` özel: kaynak ve hedef adın ikisi de izinli olmalı; yasak
 namespace'e taşıma engellenir.
 
-### B. Block UUID ile çalışanlar (block → sahip sayfa çözümü)
+### B. Block UUID ile çalışanlar (block  sahip sayfa çözümü)
 
 `delete_block`, `update_block`, `get_block`, `insert_nested_block`,
 `set_block_properties`. Bunlar sayfa adı taşımaz. Block'un sahip olduğu sayfa
 adı API'den çözülür (`get_block` zaten `page` referansı döndürür), sonra namespace
-kontrolü uygulanır. Bu, bu araçlara bir ekstra API round-trip ekler — izolasyon
+kontrolü uygulanır. Bu, bu araçlara bir ekstra API round-trip ekler - izolasyon
 için kabul edilen maliyet.
 
-### C. Liste/arama (sonuç filtreleme — sessiz)
+### C. Liste/arama (sonuç filtreleme - sessiz)
 
 `list_pages`, `search`, `query`, `find_pages_by_property` ve vektör arama
 sonuçları bloklu sayfaları sessizce eler. Mevcut `search` exclude deseni
@@ -141,7 +141,7 @@ sonuçları bloklu sayfaları sessizce eler. Mevcut `search` exclude deseni
 ## 4. Test planı
 
 - **Unit (saf fonksiyonlar):**
-  - `_namespace_matches`: `work`→`work` ✓, `work/x` ✓, `workshop` ✗,
+  - `_namespace_matches`: `work``work` , `work/x` , `workshop` ,
     case-insensitive, trailing slash normalizasyonu.
   - `_is_namespace_blocked`: exclude kazanır, katı allow-list, namespace'siz
     sayfa allow-list altında bloklanır, boş config = bloklanmaz.
@@ -151,13 +151,13 @@ sonuçları bloklu sayfaları sessizce eler. Mevcut `search` exclude deseni
 - **Tool entegrasyon:**
   - Her A-grubu tool yasak namespace'te Access denied döner.
   - `rename_page` `new_name` kontrolü.
-  - B-grubu block→page çözümü ve engelleme.
+  - B-grubu blockpage çözümü ve engelleme.
   - C-grubu sessiz filtreleme (sonuçta bloklu sayfa yok).
 - **Geriye dönük uyumluluk:** Hiçbir namespace config'i yokken davranış birebir
   aynı (boş liste = filtre yok).
 
 ## Kapsam dışı (YAGNI)
 
-- Tag bazlı include (whitelist) — bu işte gerekmedi.
-- Per-tool veya per-agent farklı politikalar — tek global config yeterli.
-- Regex/glob namespace desenleri — segment prefix yeterli.
+- Tag bazlı include (whitelist) - bu işte gerekmedi.
+- Per-tool veya per-agent farklı politikalar - tek global config yeterli.
+- Regex/glob namespace desenleri - segment prefix yeterli.

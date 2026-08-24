@@ -140,19 +140,19 @@ tail -f ~/.cache/mcp-logseq/mcp_logseq.log
 
 ```
 mcp-logseq/
-├── src/mcp_logseq/
-│   ├── __init__.py          # Package entry point
-│   ├── server.py            # MCP server initialization
-│   ├── logseq/             # Page, block, property, tag, and search clients
-│   └── tools/              # Grouped MCP tool handlers and validation
-├── tests/
-│   ├── unit/               # Unit tests
-│   └── integration/        # Integration tests
-├── README.md               # User documentation
-├── DEVELOPMENT.md          # This file
-├── ROADMAP.md             # Project roadmap
-├── pyproject.toml         # Package configuration
-└── .env.example           # Environment template
+ src/mcp_logseq/
+    __init__.py          # Package entry point
+    server.py            # MCP server initialization
+    logseq/             # Page, block, property, tag, and search clients
+    tools/              # Grouped MCP tool handlers and validation
+ tests/
+    unit/               # Unit tests
+    integration/        # Integration tests
+ README.md               # User documentation
+ DEVELOPMENT.md          # This file
+ ROADMAP.md             # Project roadmap
+ pyproject.toml         # Package configuration
+ .env.example           # Environment template
 ```
 
 ## Architecture
