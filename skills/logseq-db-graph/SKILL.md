@@ -8,15 +8,12 @@ description: Detailed rules for safely reading, planning, and writing a Logseq 2
 This skill applies only to a Logseq 2.0.x DB graph. The MCP server must run
 with `LOGSEQ_DB_MODE=true`. Do not use this skill with a Markdown/file graph.
 
-This server communicates with a DB graph through `logseq.cli.*`/`logseq.app.*`
-only. It never uses `logseq.Editor.*` for a DB graph -- that namespace is the
-file-graph adapter and is wired to a completely separate skill. You do not
-choose or influence which namespace is used; call the MCP tool names in this
-skill (`get_block`, `upsert_nodes`, `delete_block`, and so on) and the server
-always resolves each one to its `cli.*`/`app.*` DB route. If you see or are
-asked about `Editor.*` behavior while this skill is active, that is a sign the
-wrong skill or graph mode is in effect -- stop and confirm `LOGSEQ_DB_MODE` is
-`true` before continuing.
+This server communicates with a DB graph through DB-safe routes. Reads use
+`logseq.DB.datascriptQuery` where the native block route is unsafe, while
+search and supported operations use `logseq.cli.*`/`logseq.app.*`. It never
+uses `logseq.Editor.*` for a DB graph. Call the MCP tool names in this skill;
+the server selects the safe route. Confirm `LOGSEQ_DB_MODE=true` before
+continuing if `Editor.*` behavior appears while this skill is active.
 
 ## Scope and configuration
 
@@ -94,23 +91,22 @@ reorganization.
 1. Use `search_blocks` to find distinctive content and collect page/block UUIDs.
   Read `content` rather than highlighted search titles.
 2. Use `get_page_data` to obtain the page entity and its blocks, nested
-  children included by default (`expand_children` defaults to `true`, so a
-  normal call already reads the whole page -- no per-block fan-out needed). A
-  block whose subtree is too large to expand gets a `children_error` key
-  instead of failing the whole page read; retry just that one block with
-  `get_block` if you need it. Pass `expand_children=false` only when you
-  specifically want the faster flat top-level-only list.
+  children included by default (`expand_children` defaults to `true`). Child
+  trees use the safe Datascript-backed block reader and do not call
+  `cli.getBlock` or `Editor.getBlock`. Pass `expand_children=false` only when
+  you specifically want the faster flat top-level-only list.
 3. Normalize relevant nodes in memory: retain each block's UUID, title/content,
   parent, children, tags, and typed properties. Do not infer a relationship
   from display text when a UUID is available.
 4. When inspecting one known block, use `get_block(block_uuid,
-  include_children=true)` directly -- it works in DB mode without needing
-  the owning page.
+  include_children=true)`. In DB mode this uses Datascript to build the block
+  tree and does not need the owning page.
 5. Use `list_pages`, `list_tags`, and `list_properties` to discover existing
   entities before creating any of them.
 
-Do not use `get_page_content` as the primary DB page reader. Do not pass
-`include_children=false` to `get_block`.
+Do not use `get_page_content` as the primary DB page reader. In DB mode,
+`include_children=false` returns child UUID references without recursively
+expanding each child.
 
 ## Prepare typed data
 
@@ -196,11 +192,11 @@ Similarly, use DB DSL forms such as `(property key)` and `(tags tag)` rather
 than file-graph forms such as `(page-property key)` and `(page-tags tag)`.
 
 `get_page_data` includes each top-level block's full nested children by
-default (`expand_children` defaults to `true`; a very large subtree may still
-time out, reporting a `children_error` on just that block rather than failing
-the read). `get_page_content` inherits the same default. For a single known
-nested block on its own, `get_block` with `include_children=true` also works
-directly.
+default (`expand_children` defaults to `true`). The implementation uses one
+bulk `logseq.DB.datascriptQuery` snapshot and assembles the tree in memory, so
+it does not call the hanging `cli.getBlock` or `Editor.getBlock` routes.
+`get_page_content` inherits the same behavior. For a single known block,
+`get_block` uses the same Datascript-backed reader.
 
 ## Minimal-diff rules
 
@@ -208,8 +204,8 @@ directly.
 - Create a child/sibling only when the parent and desired placement are known.
 - Remove a block only when its subtree is intentionally obsolete. Deletion
   cascades to the entire subtree with no `recursive` flag or child count in
-  the response, and `get_page_data` will not show a block's children, so
-  inspect a block with `get_block` (`include_children=true`) before deleting it.
+  the response, so inspect it with `get_block` (`include_children=true`) before
+  deleting it.
 - `delete_page` soft-deletes (recycles) an ordinary page; it is safe to use
   directly. Tags, properties, and today's journal delete permanently instead
   -- that is Logseq's own recycle-bin behavior.
