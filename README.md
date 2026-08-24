@@ -7,7 +7,7 @@ with optional semantic vector search and DB-mode graph support.
 
 This repository is now a substantially expanded derivative of the original
 [ergut/mcp-logseq project](https://github.com/ergut/mcp-logseq). See
-[Project Derivation](PROJECT_DERIVATION.md) for the original design and
+[Project Derivation](docs/PROJECT_DERIVATION.md) for the original design and
 structure, the implemented changes, and current limitations.
 
 > [!WARNING]
@@ -32,7 +32,7 @@ mutations, verifying writes, and avoiding unsupported or risky API paths.
 
 Do not load both skills in the same conversation. ChatGPT can connect to this
 server through the remote HTTP MCP setup described in
-[INSTALLATION.md](INSTALLATION.md), but there is currently no equivalent
+[INSTALLATION.md](docs/INSTALLATION.md), but there is currently no equivalent
 ChatGPT skill package or skill-loading workflow. For ChatGPT, use the MCP
 tool descriptions, the installation guide, and the graph-mode environment
 setting as the source of operational guidance.
@@ -96,7 +96,7 @@ Read this legacy Markdown page and preserve its file-graph properties.
 
 ### Step 2: Install and Connect the MCP
 
-See **[INSTALLATION.md](INSTALLATION.md)** for complete setup instructions
+See **[INSTALLATION.md](docs/INSTALLATION.md)** for complete setup instructions
 for Claude Code, Claude Desktop, and ChatGPT, both from a local checkout and
 directly from GitHub. The guide also explains the `uv` commands, cache
 behavior, graph mode, remote HTTP deployment, and verification.
@@ -149,7 +149,7 @@ search with cross-language support.
 
 Use [Ollama](https://ollama.com) for fully local embeddings, OpenAI, or another OpenAI-compatible embeddings endpoint. [LanceDB](https://lancedb.com) remains local in every configuration. Hosted providers receive the note text being embedded.
 
- **[Full setup guide: VECTOR_SEARCH.md](VECTOR_SEARCH.md)**
+ **[Full setup guide: VECTOR_SEARCH.md](docs/VECTOR_SEARCH.md)**
 
 ---
 
@@ -173,7 +173,7 @@ DB search uses the companion **`logseq.app.search`** endpoint.
 
 The complete API contract, including the static DB CLI export table, namespace
 aliases, and native MCP mappings, is maintained in
-[LOGSEQ_API_ARCHITECTURE.md](LOGSEQ_API_ARCHITECTURE.md). The DB skill is the
+[LOGSEQ_API_ARCHITECTURE.md](docs/LOGSEQ_API_ARCHITECTURE.md). The DB skill is the
 operational source of truth for safe tool selection and batching.
 
 ### File Graph and DB Graph Differences
@@ -295,7 +295,7 @@ The two skills are the authoritative tool and workflow guides:
   properties, safe DB reads, dry-run validation, and `upsert_nodes` batches.
 
 For the full API surface and Logseq 2.0.1 namespace behavior, see
-[LOGSEQ_API_ARCHITECTURE.md](LOGSEQ_API_ARCHITECTURE.md).
+[LOGSEQ_API_ARCHITECTURE.md](docs/LOGSEQ_API_ARCHITECTURE.md).
 
 ### Optional Vector Tools
 
@@ -305,7 +305,7 @@ For the full API surface and Logseq 2.0.1 namespace behavior, see
 | **`sync_vector_db`**  | Point to the external vector sync writer |
 | **`vector_db_status`**  | Show vector DB health and staleness |
 
-⚗️ *Requires vector search setup. See [VECTOR_SEARCH.md](VECTOR_SEARCH.md).*
+⚗️ *Requires vector search setup. See [VECTOR_SEARCH.md](docs/VECTOR_SEARCH.md).*
 
 For detailed DB batch operations, dry-run validation, Markdown parsing, and
 safe retry rules, use the matching graph skill rather than duplicating those
@@ -357,7 +357,7 @@ returns an access-denied error.
 LOGSEQ_EXCLUDE_TAGS=private,secret
 ```
 
-**Via config file** (also used for [vector search](VECTOR_SEARCH.md)):
+**Via config file** (also used for [vector search](docs/VECTOR_SEARCH.md)):
 
 ```json
 {
@@ -527,7 +527,7 @@ Update config with full path:
 
 ##  Development
 
-For local development, testing, and contributing, see **[DEVELOPMENT.md](DEVELOPMENT.md)**.
+For local development, testing, and contributing, see **[DEVELOPMENT.md](docs/DEVELOPMENT.md)**.
 
 ### Project Structure
 
@@ -560,7 +560,7 @@ src/mcp_logseq/
 
 `logseq/` is the API client (one `LogSeq` class per graph mode); `tools/`
 is the MCP-facing layer that wraps it with validation, access control, and
-response formatting. See [LOGSEQ_API_ARCHITECTURE.md](LOGSEQ_API_ARCHITECTURE.md)
+response formatting. See [LOGSEQ_API_ARCHITECTURE.md](docs/LOGSEQ_API_ARCHITECTURE.md)
 for the `logseq.Editor.*` (file graph) vs `logseq.cli.*`/`logseq.app.*`
 (DB graph) routing policy those two packages implement.
 
