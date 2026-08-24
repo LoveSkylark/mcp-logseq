@@ -1,9 +1,10 @@
 # Install the DB Graph Skill
 
-Import this folder into Claude Desktop Skills:
+Replace `<REPO_DIR>` below with your local clone directory, then import this
+folder into Claude Desktop Skills:
 
 ```text
-E:\git\mcp-logseq\skills\logseq-db-graph
+<REPO_DIR>/skills/logseq-db-graph
 ```
 
 Configure a dedicated DB-graph MCP server. Do not set `LOGSEQ_DB_MODE=auto` for
@@ -12,7 +13,7 @@ this skill.
 Install the local checkout before configuring Claude Desktop:
 
 ```powershell
-Set-Location E:\git\mcp-logseq
+Set-Location "<REPO_DIR>"
 uv sync --extra vector
 ```
 
@@ -23,7 +24,7 @@ package and Git-branch caches.
 {
   "mcpServers": {
     "logseq-db": {
-      "command": "E:\\git\\mcp-logseq\\.venv\\Scripts\\mcp-logseq.exe",
+      "command": "<REPO_DIR>\\.venv\\Scripts\\mcp-logseq.exe",
       "args": [],
       "env": {
         "LOGSEQ_API_TOKEN": "your-logseq-api-token",

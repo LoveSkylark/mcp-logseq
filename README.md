@@ -103,16 +103,18 @@ server enables Claude to read, organize, and safely update your LogSeq graphs.
 
 ### Step 2: Install the Local MCP Server
 
-From PowerShell, install this checkout into its local virtual environment:
+From a terminal, install this checkout into its local virtual environment.
+Replace `<REPO_DIR>` with the directory where you cloned this repository:
 
 ```powershell
-Set-Location E:\git\mcp-logseq
+Set-Location "<REPO_DIR>"
 uv sync --extra vector
 ```
 
-This creates `E:\git\mcp-logseq\.venv\Scripts\mcp-logseq.exe`. Claude
-Desktop should launch that executable directly so it cannot resolve a stale
-PyPI package, Git branch, or unrelated cached environment.
+On Windows, this creates `<REPO_DIR>\.venv\Scripts\mcp-logseq.exe`; on
+macOS/Linux, it creates `<REPO_DIR>/.venv/bin/mcp-logseq`. Claude Desktop
+should launch that local executable directly so it cannot resolve a stale PyPI
+package, Git branch, or unrelated cached environment.
 
 ### Step 3: Add to Claude
 
@@ -127,7 +129,7 @@ claude mcp add mcp-logseq \
   --env MCP_READ_TOOL_TIMEOUT=90 \
   --env MCP_MAX_RESPONSE_CHARS=30000 \
   --env PYTHONIOENCODING=utf-8 \
-  -- uv run --with mcp-logseq mcp-logseq
+  -- uv run --project "<REPO_DIR>" mcp-logseq
 ```
 
 #### Claude Desktop

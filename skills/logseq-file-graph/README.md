@@ -1,9 +1,10 @@
 # Install the File Graph Skill
 
-Import this folder into Claude Desktop Skills:
+Replace `<REPO_DIR>` below with your local clone directory, then import this
+folder into Claude Desktop Skills:
 
 ```text
-E:\git\mcp-logseq\skills\logseq-file-graph
+<REPO_DIR>/skills/logseq-file-graph
 ```
 
 Configure a dedicated legacy Markdown/file-graph MCP server. Do not set
@@ -12,7 +13,7 @@ Configure a dedicated legacy Markdown/file-graph MCP server. Do not set
 Install the local checkout before configuring Claude Desktop:
 
 ```powershell
-Set-Location E:\git\mcp-logseq
+Set-Location "<REPO_DIR>"
 uv sync --extra vector
 ```
 
@@ -23,7 +24,7 @@ package and Git-branch caches.
 {
   "mcpServers": {
     "logseq-file": {
-      "command": "E:\\git\\mcp-logseq\\.venv\\Scripts\\mcp-logseq.exe",
+      "command": "<REPO_DIR>\\.venv\\Scripts\\mcp-logseq.exe",
       "args": [],
       "env": {
         "LOGSEQ_API_TOKEN": "your-logseq-api-token",

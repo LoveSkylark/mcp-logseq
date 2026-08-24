@@ -51,7 +51,7 @@ claude mcp add mcp-logseq-dev \
 {
   "mcpServers": {
     "mcp-logseq-dev": {
-      "command": "E:\\git\\mcp-logseq\\.venv\\Scripts\\mcp-logseq.exe",
+      "command": "<REPO_DIR>\\.venv\\Scripts\\mcp-logseq.exe",
       "args": [],
       "env": {
         "LOGSEQ_API_TOKEN": "your_token_here",
