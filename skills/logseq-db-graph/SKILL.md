@@ -175,9 +175,12 @@ committed batch by reading the graph.
 
 `query` is this MCP server's Logseq DSL query tool. Use it for supported DSL
 filters and discovery, but do not assume it exposes unrestricted Datascript.
-Raw `logseq.DB.datascriptQuery` is available through Logseq's HTTP API for
-advanced structural investigation, but is not a general MCP tool because raw
-queries cannot be safely filtered by this server's access policy.
+There is no `datascriptQuery` MCP tool. Do not search for it, request it, or
+call raw Logseq API methods from Claude Desktop. The server uses
+`logseq.DB.datascriptQuery` internally for `get_block` and nested
+`get_page_data` reads, where it can apply the server's access policy. The
+internal method is intentionally not exposed because arbitrary raw queries
+cannot be safely filtered by that policy.
 
 When using DB queries or interpreting DB page data, use DB schema names:
 
@@ -192,9 +195,10 @@ Similarly, use DB DSL forms such as `(property key)` and `(tags tag)` rather
 than file-graph forms such as `(page-property key)` and `(page-tags tag)`.
 
 `get_page_data` includes each top-level block's full nested children by
-default (`expand_children` defaults to `true`). The implementation uses one
-bulk `logseq.DB.datascriptQuery` snapshot and assembles the tree in memory, so
-it does not call the hanging `cli.getBlock` or `Editor.getBlock` routes.
+default (`expand_children` defaults to `true`). The server internally uses one
+bulk Datascript snapshot and assembles the tree in memory, so it does not call
+the hanging `cli.getBlock` or `Editor.getBlock` routes. Claude Desktop should
+call `get_page_data` or `get_block`, never `datascriptQuery` directly.
 `get_page_content` inherits the same behavior. For a single known block,
 `get_block` uses the same Datascript-backed reader.
 
