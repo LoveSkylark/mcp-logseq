@@ -18,6 +18,11 @@ asked about `Editor.*` behavior while this skill is active, that is a sign the
 wrong skill or graph mode is in effect -- stop and confirm `LOGSEQ_DB_MODE` is
 `true` before continuing.
 
+> **Warning:** This MCP can create, edit, move, and delete Logseq pages,
+> blocks, tags, properties, and files. Use backups, review planned changes,
+> and grant destructive permission deliberately. The AI client may ask for
+> confirmation, but this MCP cannot guarantee that a prompt will appear.
+
 ## Scope and configuration
 
 This skill is deliberately DB-only. Use a dedicated MCP server with:

@@ -14,6 +14,11 @@ Claude Desktop. Call only the MCP tool names listed in this skill; the server
 selects the safe route. DB mode never uses `logseq.Editor.*`. Confirm
 `LOGSEQ_DB_MODE=true` before continuing if file-graph behavior appears.
 
+> **Warning:** This MCP can create, edit, move, and delete Logseq pages,
+> blocks, tags, properties, and other graph data. Use backups, review planned
+> changes, and grant destructive permission deliberately. The AI client may ask
+> for confirmation, but this MCP cannot guarantee that a prompt will appear.
+
 **Hard rule for Claude Desktop:** In DB mode, `query` is not available and
 `datascriptQuery` is not available. Do not search for either tool, propose
 either tool, or call either tool. Use `search_blocks` for text discovery,

@@ -10,6 +10,14 @@ This repository is now a substantially expanded derivative of the original
 [Project Derivation](PROJECT_DERIVATION.md) for the original design and
 structure, the implemented changes, and current limitations.
 
+> [!WARNING]
+> **This MCP can change or delete your Logseq data.** Depending on the graph
+> mode and enabled tools, an AI connected to this server may create, edit,
+> move, or delete pages, blocks, tags, properties, and related graph content.
+> Use it only with a graph you have backed up, review proposed changes, and
+> grant permission deliberately. AI clients often ask for confirmation before
+> destructive actions, but permission prompts are not guaranteed by this MCP.
+
 ## ✨ What You Can Do
 
 Transform your LogSeq knowledge base into an AI-powered workspace. This MCP
