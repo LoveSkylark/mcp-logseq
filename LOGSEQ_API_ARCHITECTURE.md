@@ -305,25 +305,29 @@ Block hierarchy example:
 - Sibling block
 ```
 
-## Current Status (as of v1.4.0)
+## Current Status
 
-15 tools implemented. Block CRUD is complete:
+The current project supports both legacy file graphs and Logseq 2.x DB graphs.
+The route manifest is the source of truth for enabled, rejected, and
+unavailable operations. DB block reads use the internal Datascript-backed
+reader; DB nested inserts remain unavailable because `cli.insertBlock` can
+time out.
 
 | Operation | Tool | Status |
 | --------- | ---- | ------ |
-| Read | `get_page_content` | ✅ |
-| Create | `insert_nested_block` | ✅ |
-| Delete | `delete_block` | ✅ |
-| Update | `update_block` | ✅ |
+| Read | `get_page_content` / `get_page_data` | ✅ |
+| Create | `create_page` / `upsert_nodes` | ✅ |
+| Create nested block | `insert_nested_block` | File graphs only |
+| Delete | `delete_page` / `delete_block` | ✅ |
+| Update | `update_page` / `update_block` | Mode-dependent |
 
 ## Future Research Areas
-- **Graph context** (`logseq.App.getCurrentGraph`) - Expose which graph is active. Low effort, useful for multi-graph setups.
-- **Advanced property management** - Set block-level properties directly (`logseq.Editor.setBlockProperties`). Currently only page properties are writable.
-- ~~Asset/file operations via `logseq.Assets.*`~~ - Not useful for AI assistant context.
-- ~~UI interaction via `logseq.UI.*`~~ - UI automation from AI is fragile; not worth pursuing.
-- ~~Git operations via `logseq.Git.*`~~ - Too niche (requires Logseq's built-in git sync).
+
+See [ROADMAP.md](ROADMAP.md) for current follow-up work, including resumable
+large rewrites, live route regression tests, DB hierarchy support, and a
+compatibility-aware package rename.
 
 ---
 
-*Last Updated: 2026-02-24*
+*Last Updated: 2026-08-24*
 *Based on LogSeq source analysis and MCP server implementation*
