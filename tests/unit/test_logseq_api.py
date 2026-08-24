@@ -15,7 +15,7 @@ class TestLogSeqAPI:
         assert manifest["list_pages"]["db_method"] == "logseq.cli.listPages"
         assert manifest["list_pages"]["db_status"] == "verified"
         assert manifest["get_block"]["db_method"] == "logseq.cli.getBlock"
-        assert manifest["get_block"]["db_status"] == "verified"
+        assert manifest["get_block"]["db_status"] == "rejected"
 
     def test_route_manifest_second_verification_pass(self, mock_api_key):
         """Live-tested 2026-08-23: a second round of cli.* candidates, verified
@@ -1075,22 +1075,14 @@ class TestGetBlock:
         assert request_body["args"] == ["abc-123", {"includeChildren": False}]
 
     @responses.activate
-    def test_db_mode_get_block_uses_cli_route(self, logseq_client):
-        """get_block is verified for DB graphs (2026-08-23 fresh-restart re-test)
-        and uses logseq.cli.getBlock instead of Editor.getBlock."""
+    def test_db_mode_get_block_is_blocked_before_http(self, logseq_client):
+        """DB getBlock is blocked because it can wedge Logseq's API process."""
         logseq_client.db_mode = True
-        responses.add(
-            responses.POST,
-            "http://127.0.0.1:12315/api",
-            json={"uuid": "abc-123", "content": "DB block", "children": []},
-            status=200,
-        )
 
-        result = logseq_client.get_block("abc-123", include_children=False)
+        with pytest.raises(RuntimeError, match="get_block is not available"):
+            logseq_client.get_block("abc-123", include_children=False)
 
-        assert result["uuid"] == "abc-123"
-        request_body = json.loads(responses.calls[0].request.body)
-        assert request_body["method"] == "logseq.cli.getBlock"
+        assert not responses.calls
 
     @responses.activate
     def test_db_get_block_from_page_data_is_limited_to_page_level_blocks(self, logseq_client_db):

@@ -158,10 +158,10 @@ GRAPH_OPERATION_ROUTES: dict[str, GraphOperationRoute] = {
     # out a global wedge masking a per-method issue). No Editor.* fallback —
     # these operations are simply unavailable on DB graphs.
     "get_block": GraphOperationRoute(
-        "logseq.Editor.getBlock", "logseq.cli.getBlock", "verified",
-        notes="Live-tested 2026-08-23: hung repeatedly in a session with prior "
-        "failed Editor.* write attempts, but succeeded instantly on a fresh "
-        "Logseq restart -- see the wedge-recovery note in delete_block.",
+        "logseq.Editor.getBlock", "logseq.cli.getBlock", "rejected",
+        notes="Blocked in DB mode because cli.getBlock timed out for valid blocks "
+        "immediately after a clean Logseq 2.0.1 restart, with and without "
+        "includeChildren. Use get_page_data or search instead.",
     ),
     "get_block_properties": GraphOperationRoute(
         "logseq.Editor.getBlockProperties", "logseq.cli.getBlockProperties", "verified",
