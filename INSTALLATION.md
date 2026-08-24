@@ -22,6 +22,11 @@ Use one graph mode per MCP server:
 - `LOGSEQ_DB_MODE=true` for a Logseq 2.x DB graph.
 - `LOGSEQ_DB_MODE=false` for a legacy Markdown/file graph.
 
+Use one of these explicit values for a dedicated Claude deployment. The
+legacy `auto` value remains available only for a mixed deployment that is
+intentionally able to support both graph types; do not use it with either
+graph skill.
+
 Do not load both graph skills in the same Claude conversation.
 
 ## What the uv Commands Mean

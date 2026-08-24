@@ -119,7 +119,8 @@ not import both skills into the same conversation.
 | Legacy Markdown/file graph | [File graph skill](skills/logseq-file-graph/README.md) with `LOGSEQ_DB_MODE=false` |
 
 The skills contain the safe read/write workflow, markup rules, schema details,
-and the exact Claude Desktop configuration. Use `LOGSEQ_DB_MODE=auto` only for
+and the exact Claude Desktop configuration. Use `LOGSEQ_DB_MODE=true` or
+`false` for normal deployments. The legacy `auto` value is retained only for
 non-skill deployments that intentionally support both graph types.
 
 ### Step 3: Start Using
@@ -131,8 +132,10 @@ non-skill deployments that intentionally support both graph types.
 ### Choose a Graph Mode
 
 `LOGSEQ_DB_MODE=true` forces the DB-native API path. `false` forces the legacy
-Markdown/file path. `auto` detects the active graph and retains the full tool
-catalog for non-skill deployments.
+Markdown/file path. Use one of these explicit values for Claude Desktop and
+Claude Code. The legacy `auto` value detects the active graph and retains the
+full tool catalog only for deployments intentionally supporting both graph
+types; it is not valid for either dedicated graph skill.
 
 Read-only tools stop after `MCP_READ_TOOL_TIMEOUT` seconds (default `90`), and
 their output is capped by `MCP_MAX_RESPONSE_CHARS` (default `30000`). Set the
