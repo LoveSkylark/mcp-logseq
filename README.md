@@ -101,39 +101,14 @@ server enables Claude to read, organize, and safely update your LogSeq graphs.
 2. Click the **API button (🔌)** in LogSeq → **"Start server"**
 3. **Generate API token**: API panel → "Authorization tokens" → Create new
 
-### Step 2: Install the Local MCP Server
+### Step 2: Install and Connect the MCP
 
-From a terminal, install this checkout into its local virtual environment.
-Replace `<REPO_DIR>` with the directory where you cloned this repository:
+See **[INSTALLATION.md](INSTALLATION.md)** for complete setup instructions
+for Claude Code and Claude Desktop, both from a local checkout and directly
+from GitHub. The guide also explains the `uv` commands, cache behavior, graph
+mode, and deployment verification.
 
-```powershell
-Set-Location "<REPO_DIR>"
-uv sync --extra vector
-```
-
-On Windows, this creates `<REPO_DIR>\.venv\Scripts\mcp-logseq.exe`; on
-macOS/Linux, it creates `<REPO_DIR>/.venv/bin/mcp-logseq`. Claude Desktop
-should launch that local executable directly so it cannot resolve a stale PyPI
-package, Git branch, or unrelated cached environment.
-
-### Step 3: Add to Claude
-
-#### Claude Code
-
-```bash
-claude mcp add mcp-logseq \
-  --env LOGSEQ_API_TOKEN=your_token_here \
-  --env LOGSEQ_API_URL=http://localhost:12315 \
-  --env LOGSEQ_DB_MODE=true \
-  --env LOGSEQ_API_CONNECT_TIMEOUT=10 \
-  --env LOGSEQ_API_READ_TIMEOUT=60 \
-  --env MCP_READ_TOOL_TIMEOUT=90 \
-  --env MCP_MAX_RESPONSE_CHARS=30000 \
-  --env PYTHONIOENCODING=utf-8 \
-  -- uv run --project "<REPO_DIR>" mcp-logseq
-```
-
-#### Claude Desktop
+#### Claude Desktop skills
 
 Choose exactly one mode-specific skill and its matching MCP configuration. Do
 not import both skills into the same conversation.
@@ -147,7 +122,7 @@ The skills contain the safe read/write workflow, markup rules, schema details,
 and the exact Claude Desktop configuration. Use `LOGSEQ_DB_MODE=auto` only for
 non-skill deployments that intentionally support both graph types.
 
-### Step 4: Start Using
+### Step 3: Start Using
 
 ```text
 "Please help me organize my LogSeq notes. Show me what pages I have."
