@@ -124,6 +124,7 @@ package, Git branch, or unrelated cached environment.
 claude mcp add mcp-logseq \
   --env LOGSEQ_API_TOKEN=your_token_here \
   --env LOGSEQ_API_URL=http://localhost:12315 \
+  --env LOGSEQ_DB_MODE=true \
   --env LOGSEQ_API_CONNECT_TIMEOUT=10 \
   --env LOGSEQ_API_READ_TIMEOUT=60 \
   --env MCP_READ_TOOL_TIMEOUT=90 \
