@@ -8,12 +8,16 @@ description: Detailed rules for safely reading, planning, and writing a Logseq 2
 This skill applies only to a Logseq 2.0.x DB graph. The MCP server must run
 with `LOGSEQ_DB_MODE=true`. Do not use this skill with a Markdown/file graph.
 
-This server communicates with a DB graph through DB-safe routes. Reads use
-`logseq.DB.datascriptQuery` where the native block route is unsafe, while
-search and supported operations use `logseq.cli.*`/`logseq.app.*`. It never
-uses `logseq.Editor.*` for a DB graph. Call the MCP tool names in this skill;
-the server selects the safe route. Confirm `LOGSEQ_DB_MODE=true` before
-continuing if `Editor.*` behavior appears while this skill is active.
+This server communicates with a DB graph through DB-safe routes. The internal
+database query implementation is not an MCP tool and must never be called by
+Claude Desktop. Call only the MCP tool names listed in this skill; the server
+selects the safe route. DB mode never uses `logseq.Editor.*`. Confirm
+`LOGSEQ_DB_MODE=true` before continuing if file-graph behavior appears.
+
+**Hard rule for Claude Desktop:** In DB mode, `query` is not available and
+`datascriptQuery` is not available. Do not search for either tool, propose
+either tool, or call either tool. Use `search_blocks` for text discovery,
+`get_page_data` for page structure, and `get_block` for one known block.
 
 ## Scope and configuration
 
@@ -175,14 +179,14 @@ committed batch by reading the graph.
 
 ## Queries and DB schema
 
-`query` is this MCP server's Logseq DSL query tool. Use it for supported DSL
-filters and discovery, but do not assume it exposes unrestricted Datascript.
-There is no `datascriptQuery` MCP tool. Do not search for it, request it, or
-call raw Logseq API methods from Claude Desktop. The server uses
-`logseq.DB.datascriptQuery` internally for `get_block` and nested
-`get_page_data` reads, where it can apply the server's access policy. The
-internal method is intentionally not exposed because arbitrary raw queries
-cannot be safely filtered by that policy.
+The `query` MCP tool is file-graph-only and is not available in DB mode.
+Existing DB query blocks may contain Logseq DSL text, but that text is stored
+content for interpretation, not an MCP command to execute. Do not search for
+or call a `query` tool in DB mode. There is also no `datascriptQuery` MCP tool,
+and Claude Desktop must not call raw Logseq API methods. The server uses its
+internal database reader behind `get_block` and nested `get_page_data` reads,
+where it can apply access controls. For DB discovery, use `search_blocks`,
+`get_page_data`, `list_pages`, `list_tags`, and `list_properties`.
 
 When using DB queries or interpreting DB page data, use DB schema names:
 
@@ -321,7 +325,8 @@ syntax.
 ### Queries, views, and organization
 
 - Use `search_blocks` for text discovery and `get_page_data` for page structure.
-  Use `query` only for the MCP's supported DB DSL operations.
+  `query` is unavailable in DB mode. Interpret stored query text as content;
+  do not attempt to execute it through MCP.
 - DB query vocabulary uses `(property ...)`, `(tags ...)`, and `:block/title`.
   Legacy `(page-property ...)`, `(page-tags ...)`, and `:block/content` forms
   are file-graph conventions.
