@@ -5,6 +5,11 @@
 Connect Claude to your LogSeq knowledge base. Read, create, and manage pages
 with optional semantic vector search and DB-mode graph support.
 
+This repository is now a substantially expanded derivative of the original
+[ergut/mcp-logseq project](https://github.com/ergut/mcp-logseq). See
+[Project Derivation](PROJECT_DERIVATION.md) for the original design and
+structure, the implemented changes, and current limitations.
+
 ## ✨ What You Can Do
 
 Transform your LogSeq knowledge base into an AI-powered workspace. This MCP
