@@ -44,12 +44,13 @@ The adapter keeps the API namespaces separate:
 | Graph mode | Read/write surface | Policy |
 | --- | --- | --- |
 | Legacy file graph | `logseq.Editor.*` | Use the Markdown/file compatibility handlers. |
-| Logseq 2.x DB graph | `logseq.cli.*` plus `logseq.app.search` | Use DB node UUIDs and the native CLI handlers only. |
+| Logseq 2.x DB graph | `logseq.DB.*`, `logseq.cli.*`, and `logseq.app.*` | Use DB node UUIDs and the server-selected DB-safe handlers. |
 
-The verified DB CLI endpoints are `getPageData`, `listPages`, `listTags`,
-`listProperties`, and `upsertNodes`. Existing `Editor.*` property/tag wrappers
-remain compatibility code and are not considered valid DB-mode mutation paths
-until verified against the target Logseq release.
+The verified DB endpoints include `getPageData`, `listPages`, `listTags`,
+`listProperties`, `upsertNodes`, and the supported `cli.*` operations in the
+route manifest. Block-tree reads use the MCP's internal bulk
+`logseq.DB.datascriptQuery` reader because both native `getBlock` routes can
+hang on Logseq 2.0.1. Raw Datascript is not exposed as an MCP tool.
 
 ### Operation Route Map
 
@@ -59,40 +60,36 @@ alias can accept a request while still requiring different arguments or exposing
 unsafe behavior.
 
 Each logical operation records its file method, DB method, DB verification
-status, and any temporary fallback. Verified DB entries are enabled immediately.
-Candidate entries keep their existing fallback until live tests confirm the
-method, payload, response shape, repeated-call behavior, and read-back result.
-Rejected entries keep the fallback permanently: live testing showed the DB
-method itself is unsafe (e.g. it hangs) rather than merely unverified.
+status, and notes. Verified DB entries are enabled immediately. Rejected or
+untested DB entries fail fast in DB mode; there is no cross-namespace fallback
+to `Editor.*`. Promote a route only after live testing confirms its method,
+payload, response shape, repeated-call behavior, and read-back result.
 
 Export the current map for the Windows DB test lab with:
 
 ```bash
-python scripts/export-db-route-manifest.py
+python tests/integration/export-db-route-manifest.py
 ```
 
 Promote a candidate only after the DB harness records a successful scenario.
 This keeps file behavior stable while allowing the DB adapter to migrate one
 operation at a time.
 
-### Confirmed-unsafe DB CLI methods (live-tested against Logseq 2.0.1)
+### Historical native-route findings
 
-- `logseq.cli.getBlock` hangs indefinitely (curl timeout, HTTP 0) for both
-  `includeChildren: true` and `includeChildren: false`, while other `cli.*`
-  calls made in the same session return normally. `get_block` stays routed to
-  `logseq.Editor.getBlock`.
-- `logseq.cli.getBlockProperties` hangs the same way even with a bare block
-  UUID argument and no options object. `get_block_properties` stays routed to
-  `logseq.Editor.getBlockProperties`.
-- `logseq.cli.getBlockProperty` hangs the same way. `get_block_property` stays
-  routed to `logseq.Editor.getBlockProperty`.
-- `logseq.cli.addTagExtends`/`logseq.cli.removeTagExtends` hang with tag-only
-  arguments (no block involved), independently reproduced across two separate
-  sessions. `add_tag_extends`/`remove_tag_extends` stay routed to `Editor.*`.
-- `logseq.cli.updateBlock` hangs. `update_block` stays routed to
-  `logseq.Editor.updateBlock`.
-- `logseq.cli.createPage` hangs even for a brand-new page. `create_page` stays
-  routed to `logseq.Editor.createPage`.
+The following findings explain why the current adapter avoids some endpoints.
+They are not instructions to call raw routes directly.
+
+- `logseq.cli.getBlock` and `logseq.Editor.getBlock` can hang indefinitely for
+  both child options while other API calls remain responsive. The MCP's
+  `get_block` operation therefore uses its internal Datascript reader instead.
+- Native `getBlockProperties` routes can hang. The MCP keeps the verified route
+  map explicit and does not silently substitute an unrelated namespace.
+- `logseq.cli.getBlockProperty` hung in an earlier test session. The current
+  route map records its status and the handler applies the safe DB path.
+- `logseq.cli.addTagExtends`, `removeTagExtends`, `updateBlock`, and
+  `createPage` also hung in earlier sessions, but later fresh-restart tests
+  verified the current DB mappings. The route manifest is the source of truth.
 - `logseq.cli.getPagesFromNamespace`/`logseq.cli.getPagesTreeFromNamespace` are
   not hangs but crash with a clean HTTP 500
   (`Cannot read properties of undefined (reading 'apply')`) — not viable
@@ -102,20 +99,17 @@ Each hang above was independently confirmed responsive-server-otherwise:
 another `cli.*` call made immediately before and after each timeout returned
 normally in milliseconds, ruling out a global wedge masking a per-method issue.
 
-### Confirmed-safe DB CLI methods promoted from candidate to verified (2026-08-23)
+### Verified DB methods promoted from live testing (2026-08-23)
 
 `get_property`, `get_tag`, `get_tags_by_name`, `get_tag_objects`, `create_tag`,
 `add_tag_property`, and `remove_tag_property` were each live-tested directly
 (real non-null responses, verified committed effects for the mutating ones)
 and promoted to `logseq.cli.*` in `GRAPH_OPERATION_ROUTES`.
 
-`logseq.cli.upsertProperty` is not viable for creating a new property from an
-external (non-plugin) caller: it returns a clean HTTP 500
-`"Plugins can only upsert its own properties"`. This is Logseq's actual
-ownership model for plugin-namespaced writes, not a bug — and it's the same
-reason bare-name creates land under `:plugin.*._test_plugin/*` via `Editor.*`
-too. `upsert_property` stays on `Editor.*` (same behavior either way) with the
-documented recommendation to create new properties via `upsert_nodes` instead.
+`logseq.cli.upsertProperty` may create plugin-namespaced properties when given
+bare names. Resolve existing properties to full idents and prefer
+`upsert_nodes` for new properties. The current route map is the source of truth
+for whether a DB operation is enabled.
 
 ### Known DB property/tag pitfalls (live-tested)
 

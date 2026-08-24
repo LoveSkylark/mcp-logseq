@@ -1,6 +1,7 @@
 # Development Guide
 
-This guide covers local development, testing, and contributing to the MCP LogSeq server.
+This guide covers local development, testing, and contributing to the current
+DB-aware MCP Logseq server.
 
 ## Prerequisites
 
@@ -15,7 +16,7 @@ This guide covers local development, testing, and contributing to the MCP LogSeq
 
 ```bash
 # Clone the repository
-git clone https://github.com/ergut/mcp-logseq.git
+git clone https://github.com/LoveSkylark/mcp-logseq.git
 cd mcp-logseq
 
 # Install dependencies
@@ -42,7 +43,7 @@ LOGSEQ_API_URL=http://localhost:12315
 claude mcp add mcp-logseq-dev \
   --env LOGSEQ_API_TOKEN=your_token_here \
   --env LOGSEQ_API_URL=http://localhost:12315 \
-  -- uv run --directory /path/to/mcp-logseq mcp-logseq
+  -- uv run --project /path/to/mcp-logseq mcp-logseq
 ```
 
 #### For Claude Desktop (Development)
@@ -53,7 +54,7 @@ claude mcp add mcp-logseq-dev \
       "command": "uv",
       "args": [
         "run", 
-        "--directory", 
+        "--project",
         "/path/to/mcp-logseq",
         "mcp-logseq"
       ],
@@ -90,7 +91,8 @@ uv run pytest --cov=mcp_logseq --cov-report=html
 - **Unit tests**: Test individual components (LogSeq API client, tool handlers)
 - **Integration tests**: Test MCP server functionality end-to-end
 - **HTTP mocking**: Uses `responses` library for reliable testing
-- **50+ comprehensive tests** with 100% success rate
+- **Comprehensive unit and integration coverage** for the current package
+  architecture, DB routes, access controls, transports, and vector features
 
 For detailed testing documentation, see [TESTING.md](TESTING.md).
 
@@ -103,7 +105,7 @@ The best way to debug MCP servers is using the MCP Inspector:
 ```bash
 # Debug local development version
 npx @modelcontextprotocol/inspector \
-  uv run --directory /path/to/mcp-logseq mcp-logseq
+  uv run --project /path/to/mcp-logseq mcp-logseq
 ```
 
 ### Direct Testing
@@ -145,8 +147,8 @@ mcp-logseq/
 ├── src/mcp_logseq/
 │   ├── __init__.py          # Package entry point
 │   ├── server.py            # MCP server initialization
-│   ├── logseq.py           # LogSeq API client
-│   └── tools.py            # MCP tool handlers
+│   ├── logseq/             # Page, block, property, tag, and search clients
+│   └── tools/              # Grouped MCP tool handlers and validation
 ├── tests/
 │   ├── unit/               # Unit tests
 │   └── integration/        # Integration tests
@@ -162,8 +164,8 @@ mcp-logseq/
 ### Core Components
 
 - **`server.py`**: MCP server setup, tool registration, request handling
-- **`logseq.py`**: LogSeq API client with JSON-RPC methods
-- **`tools.py`**: Tool handlers that transform API responses for Claude
+- **`logseq/`**: API client mixins with explicit File/DB route selection
+- **`tools/`**: Tool handlers, validation, access control, and formatting
 
 ### Tool Handler Pattern
 
@@ -196,7 +198,7 @@ class ExampleToolHandler(ToolHandler):
 
 ### Adding New Tools
 
-1. Create a new `ToolHandler` subclass in `tools.py`
+1. Create a new `ToolHandler` subclass in the appropriate `tools/` module
 2. Implement required methods
 3. Register the tool in `server.py`
 4. Add corresponding LogSeq API method if needed

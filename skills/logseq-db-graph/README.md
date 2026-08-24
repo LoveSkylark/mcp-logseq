@@ -3,7 +3,7 @@
 Import this folder into Claude Desktop Skills:
 
 ```text
-/absolute/path/to/mcp-logseq/skills/logseq-db-graph
+E:\git\mcp-logseq\skills\logseq-db-graph
 ```
 
 Configure a dedicated DB-graph MCP server. Do not set `LOGSEQ_DB_MODE=auto` for
@@ -13,8 +13,8 @@ this skill.
 {
   "mcpServers": {
     "logseq-db": {
-      "command": "/absolute/path/to/uvx",
-      "args": ["--with", "mcp>=2,<3", "mcp-logseq"],
+      "command": "C:\\Users\\YOUR_USER\\.local\\bin\\uv.exe",
+      "args": ["run", "--project", "E:\\git\\mcp-logseq", "mcp-logseq"],
       "env": {
         "LOGSEQ_API_TOKEN": "your-logseq-api-token",
         "LOGSEQ_DB_MODE": "true",

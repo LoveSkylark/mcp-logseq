@@ -10,12 +10,14 @@ The testing framework is built using pytest and provides comprehensive coverage 
 
 ```
 tests/
-├── conftest.py                 # Shared fixtures and test configuration
-├── unit/                      # Unit tests for individual components
-│   ├── test_logseq_api.py     # Tests for LogSeq API client
-│   └── test_tool_handlers.py  # Tests for MCP tool handlers
-└── integration/               # Integration tests for system components
-    └── test_mcp_server.py     # Tests for MCP server integration
+├── conftest.py
+├── unit/                      # API, handlers, access, parser, and vector tests
+└── integration/               # MCP/HTTP tests and live DB harnesses
+    ├── test_mcp_server.py
+    ├── test_http_serving.py
+    ├── test-logseq-db-api.ps1  # Live Logseq 2.x API lab
+    ├── test-db-editor-mutations.ps1
+    └── export-db-route-manifest.py
 ```
 
 ## Dependencies
@@ -32,49 +34,67 @@ The testing framework uses the following dependencies:
 ### Basic Usage
 
 ```bash
-# Run all tests
-uv run pytest
+# Run all tests from a local checkout
+uv run --project . pytest
 
 # Run with verbose output
-uv run pytest -v
+uv run --project . pytest -v
 
 # Run with short traceback format
-uv run pytest --tb=short
+uv run --project . pytest --tb=short
 ```
 
 ### Running Specific Test Categories
 
 ```bash
 # Run only unit tests
-uv run pytest tests/unit/
+uv run --project . pytest tests/unit/
 
 # Run only integration tests
-uv run pytest tests/integration/
+uv run --project . pytest tests/integration/
 
 # Run specific test file
-uv run pytest tests/unit/test_logseq_api.py
+uv run --project . pytest tests/unit/test_logseq_api.py
 
 # Run specific test class
-uv run pytest tests/unit/test_logseq_api.py::TestLogSeqAPI
+uv run --project . pytest tests/unit/test_logseq_api.py::TestLogSeqAPI
 
 # Run specific test method
-uv run pytest tests/unit/test_logseq_api.py::TestLogSeqAPI::test_create_page_success
+uv run --project . pytest tests/unit/test_logseq_api.py::TestLogSeqAPI::test_create_page_success
 ```
 
 ### Test Output Options
 
 ```bash
 # Show detailed output for failed tests
-uv run pytest -v --tb=long
+uv run --project . pytest -v --tb=long
 
 # Show only test names and results
-uv run pytest -q
+uv run --project . pytest -q
 
 # Stop after first failure
-uv run pytest -x
+uv run --project . pytest -x
 
 # Show local variables in tracebacks
-uv run pytest -l
+uv run --project . pytest -l
+```
+
+### Live Logseq DB Harness
+
+These are manual integration-lab scripts, not part of the normal pytest run.
+They require Logseq 2.x with its HTTP API enabled and a disposable DB graph.
+Run the core setup first:
+
+```powershell
+.\tests\integration\test-logseq-db-api.ps1 -Suite Core -Token "your-token"
+```
+
+The harness stores temporary UUID state under the user's temp directory. Any
+scenario that targets a potentially wedged native route must be run only after
+restarting Logseq. Export the current route map with:
+
+```bash
+uv run --project . python tests/integration/export-db-route-manifest.py
 ```
 
 ## Test Coverage
@@ -83,7 +103,7 @@ uv run pytest -l
 
 #### LogSeq API Client (`test_logseq_api.py`)
 
-Tests for the `LogSeq` class covering:
+Tests for the `LogSeq` client and its mixins covering:
 
 - **Initialization**: Default and custom parameters
 - **URL Generation**: Base URL construction
@@ -109,13 +129,10 @@ Tests for all MCP tool handler classes:
 - **Input Validation**: Required parameters, type checking
 - **Output Formatting**: Text and JSON response formats
 
-**Covered Tool Handlers:**
-- `CreatePageToolHandler`
-- `ListPagesToolHandler`
-- `GetPageContentToolHandler`
-- `DeletePageToolHandler`
-- `UpdatePageToolHandler`
-- `SearchToolHandler`
+The handler tests cover the grouped page, block, property, tag, DB-native,
+search, and vector handlers. The API tests also cover route selection,
+Datascript-backed DB block trees, malformed request filtering, and response
+normalization.
 
 ### Integration Tests
 
