@@ -226,10 +226,9 @@ GRAPH_OPERATION_ROUTES: dict[str, GraphOperationRoute] = {
         "real limitation of this route -- see the wedge-recovery note below.",
     ),
     "insert_block": GraphOperationRoute(
-        "logseq.Editor.insertBlock", "logseq.cli.insertBlock", "verified",
-        notes="Live-tested 2026-08-23: hung in an earlier, already-wedged Editor.* "
-        "write session, but succeeded instantly on a fresh Logseq restart, "
-        "returning the newly-created child block entity.",
+        "logseq.Editor.insertBlock", "logseq.cli.insertBlock", "rejected",
+        notes="Blocked in DB mode because cli.insertBlock timed out during live "
+        "testing. Use upsert_nodes for supported flat block creation instead.",
     ),
     "remove_property": GraphOperationRoute(
         "logseq.Editor.removeProperty", "logseq.cli.removeProperty", "verified",

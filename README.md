@@ -265,17 +265,13 @@ from a single test.
 | `get_pages_tree_from_namespace` | ✅ | |
 | `rename_page` | ✅ | ✅ |
 | `get_page_backlinks` | ✅ | |
-| `insert_nested_block` | ✅ | ✅ |
+| `insert_nested_block` | ✅ | |
 | `set_block_properties` | | ✅ |
 | `vector_search` ⚗️ | ✅ | ✅ |
 | `sync_vector_db` ⚗️ | ✅ | ✅ |
 | `vector_db_status` ⚗️ | ✅ | ✅ |
 
 - **✅**: works in both graph modes, or is DB-native and works in DB mode.
-- **❌**: registered but currently unavailable on DB graphs — no verified
-  `cli.*` route exists yet (`_DBToolHandler`/`_method_for` raise a clear
-  "not available for Logseq DB graphs" error rather than silently using
-  `Editor.*`). Use `upsert_nodes` for DB writes where possible instead.
 - **`Editor.*` writes can wedge after repeated calls in one session** and
   need a Logseq restart to recover — a hang during testing does not always
   mean a route is broken. `delete_block` was initially misclassified as

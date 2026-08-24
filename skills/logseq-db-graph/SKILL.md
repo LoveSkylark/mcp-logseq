@@ -147,9 +147,11 @@ batch, use the matching DB property/tag handler only after reading the current
 entity and schema. `update_block`, `insert_nested_block`, `upsert_block_property`,
 `remove_block_property`, `add_block_tag`, `remove_block_tag`, `add_tag_extends`,
 `remove_tag_extends`, `upsert_property`, `remove_property`, and `create_page`
-all work on DB graphs for exactly this case -- each is a single `cli.*` write,
-so prefer `upsert_nodes` for anything batchable (especially a new page plus
-its blocks/tags/properties in one call) and reserve these for one-off edits.
+work on DB graphs for exactly this case -- each is a single `cli.*` write.
+`insert_nested_block` is unavailable in DB mode because `cli.insertBlock` can
+time out; use `upsert_nodes` for supported flat block creation. Prefer
+`upsert_nodes` for anything batchable, especially a new page plus its
+blocks/tags/properties in one call.
 
 ### Verified batch semantics
 
@@ -254,7 +256,7 @@ call a raw Logseq API method directly.
 
 - **Pages**: `create_page`, `list_pages`, `get_page_data`, `get_page_content`,
   `delete_page`, `rename_page`.
-- **Blocks**: `get_block`, `update_block`, `delete_block`, `insert_nested_block`.
+- **Blocks**: `get_block`, `update_block`, `delete_block`.
 - **Properties**: `get_property`, `upsert_property`, `remove_property`,
   `list_properties`, `get_block_properties`, `get_block_property`,
   `upsert_block_property`, `remove_block_property`, `set_block_properties`.
@@ -267,7 +269,8 @@ call a raw Logseq API method directly.
 
 Not available in DB mode (file-graph-only; do not attempt): `update_page`,
 `query`, `find_pages_by_property`, `get_pages_from_namespace`,
-`get_pages_tree_from_namespace`, `get_page_backlinks`. Use `upsert_nodes` or
+`get_pages_tree_from_namespace`, `get_page_backlinks`, `insert_nested_block`.
+Use `upsert_nodes` or
 `get_page_data` plus in-memory filtering for the equivalent DB-mode need.
 
 ## Failure handling

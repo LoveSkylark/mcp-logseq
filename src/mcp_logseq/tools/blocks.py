@@ -272,13 +272,12 @@ class InsertNestedBlockToolHandler(ToolHandler):
         properties = args.get("properties")
         sibling = args.get("sibling", False)
 
-        if properties and _tools._get_db_mode():
+        if _tools._get_db_mode():
             return [TextContent(
                 type="text",
-                text="❌ DB graphs don't support insert_nested_block's properties "
-                "argument (it's file-graph Markdown syntax and silently mints junk "
-                "properties instead of a real one). Insert the block first, then use "
-                "upsert_block_property or set_block_properties to set DB properties.",
+                text="❌ insert_nested_block is unavailable for DB graphs because "
+                "Logseq's cli.insertBlock route can time out. Use upsert_nodes "
+                "for supported flat block creation instead.",
             )]
 
         try:

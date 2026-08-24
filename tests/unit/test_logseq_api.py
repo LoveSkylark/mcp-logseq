@@ -51,6 +51,12 @@ class TestLogSeqAPI:
         assert client._method_for("list_pages") == "logseq.cli.listPages"
         assert client._method_for("search") == "logseq.app.search"
 
+    def test_db_insert_block_route_is_rejected(self, mock_api_key):
+        client = LogSeq(api_key=mock_api_key, db_mode=True)
+
+        with pytest.raises(RuntimeError, match="insert_block is not available"):
+            client._method_for("insert_block")
+
     def test_api_session_rejects_unknown_method_before_http(self, mock_api_key):
         client = LogSeq(api_key=mock_api_key)
 

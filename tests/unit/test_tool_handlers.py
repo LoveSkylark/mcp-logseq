@@ -1717,6 +1717,20 @@ class TestGetPageBacklinksToolHandler:
 class TestInsertNestedBlockToolHandler:
     """Test cases for InsertNestedBlockToolHandler."""
 
+    @patch.dict("os.environ", {"LOGSEQ_API_TOKEN": "test_token", "LOGSEQ_DB_MODE": "true"})
+    @patch("mcp_logseq.tools._get_db_mode", return_value=True)
+    @patch("mcp_logseq.tools.logseq.LogSeq")
+    def test_db_run_tool_rejects_before_logseq_call(self, mock_logseq_class, mock_db_mode):
+        handler = InsertNestedBlockToolHandler()
+
+        result = handler.run_tool({
+            "parent_block_uuid": "parent-uuid",
+            "content": "Child block content",
+        })
+
+        mock_logseq_class.assert_not_called()
+        assert "unavailable for DB graphs" in result[0].text
+
     def test_get_tool_description(self):
         """Test tool description schema."""
         handler = InsertNestedBlockToolHandler()
