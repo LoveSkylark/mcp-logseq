@@ -159,15 +159,15 @@ The server provides 39 verified standard tools, grouped by graph type, plus 3 op
 
 ### API Connection Points
 
-The service connects to Logseq through two primary API namespaces:
+The service connects to Logseq through these API namespaces:
 
 1. **`logseq.Editor.*`**: page, block, property, and tag operations for the
   legacy file-graph adapter. File graphs use this exclusively.
-2. **`logseq.cli.*`**: Logseq 2.x DB-native page discovery, page data, and
-  batch node operations. DB graphs use this (plus `logseq.app.*`)
-  exclusively — there is no fallback to `logseq.Editor.*`, so an operation
-  with no verified `cli.*` route is unavailable rather than silently using
-  the file-graph API. See [Tool Availability by Graph Type](#tool-availability-by-graph-type).
+2. **`logseq.cli.*` and `logseq.DB.*`**: DB-native page discovery, supported
+  operations, batch node mutations, and safe Datascript-backed block reads.
+  DB graphs also use `logseq.app.*` for search. They never fall back to
+  `logseq.Editor.*`; an operation with no safe DB route is unavailable rather
+  than silently using the file-graph API. See [Tool Availability by Graph Type](#tool-availability-by-graph-type).
 
 DB search uses the companion **`logseq.app.search`** endpoint.
 
@@ -193,7 +193,7 @@ operational source of truth for safe tool selection and batching.
 
 Several MCP capabilities exist in both deployments, but they are backed by
 different Logseq APIs. File graphs use `logseq.Editor.*` exclusively; DB
-graphs use `logseq.cli.*`/`logseq.app.*` exclusively. The MCP tool name is
+graphs use `logseq.DB.*`, `logseq.cli.*`, and `logseq.app.*` by operation. The MCP tool name is
 not the same thing as the Logseq API method name.
 
 | Capability | File graph tool and API | DB graph tool and API |
@@ -201,13 +201,13 @@ not the same thing as the Logseq API method name.
 | List pages | `list_pages` -> `logseq.Editor.getAllPages` | `list_pages` -> `logseq.cli.listPages` |
 | Read page-level blocks | `get_page_content` -> `getPage` + `getPageBlocksTree` | `get_page_data` -> `logseq.cli.getPageData` |
 | Find content | `search` -> `logseq.App.search` | `search_blocks` -> `logseq.app.search` |
-| Read a block/tree | `get_block` -> `logseq.Editor.getBlock` | `get_block` -> `logseq.cli.getBlock` |
+| Read a block/tree | `get_block` -> `logseq.Editor.getBlock` | `get_block` -> bulk `logseq.DB.datascriptQuery` |
 | Create or edit nodes | page/block `Editor.*` tools | `upsert_nodes` -> `logseq.cli.upsertNodes` |
 | Read tags | page properties / `Editor.*` compatibility behavior | `list_tags` -> `logseq.cli.listTags` |
 | Read properties | Markdown properties / `Editor.*` compatibility behavior | `list_properties` -> `logseq.cli.listProperties` |
 
 When the graph is DB-based, prefer the DB column in this table. DB graphs use
-`logseq.cli.*`/`logseq.app.*` exclusively — there is no fallback to
+`logseq.DB.*`, `logseq.cli.*`, and `logseq.app.*` by operation — there is no fallback to
 `logseq.Editor.*`, so an operation with no verified `cli.*` route is simply
 unavailable rather than silently using the file-graph API. See
 [Tool Availability by Graph Type](#tool-availability-by-graph-type) below for
@@ -220,7 +220,7 @@ A tool is only registered when `LOGSEQ_DB_MODE` is forced to `true` or
 unsupported one fails at call time with an "available only for..." /
 "not available for Logseq DB graphs" message.
 
-DB graphs use `logseq.cli.*` exclusively — there is **no fallback** to
+DB graphs use `logseq.DB.*`, `logseq.cli.*`, and `logseq.app.*` by operation — there is **no fallback** to
 `logseq.Editor.*` when a `cli.*` route hangs or errors. `Editor.*` writes can
 wedge after several calls in one session and need a Logseq restart to
 recover — see the note below the table before concluding a route is broken
@@ -283,6 +283,11 @@ from a single test.
   session wedged the write path, and re-testing the same session kept
   reproducing the wedge rather than the route's real (working) behavior. A
   route is only genuinely rejected if it still fails on a fresh restart.
+
+DB `get_block` does not call either native `getBlock` endpoint. It uses one
+bulk `logseq.DB.datascriptQuery` snapshot and builds the requested tree in
+memory. `get_page_data` uses the same reader when `expand_children` is true,
+which is the default. This avoids the Logseq 2.0.1 `getBlock` timeout path.
 
 ### Detailed Tool Guidance
 
