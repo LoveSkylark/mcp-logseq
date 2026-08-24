@@ -158,10 +158,9 @@ GRAPH_OPERATION_ROUTES: dict[str, GraphOperationRoute] = {
     # out a global wedge masking a per-method issue). No Editor.* fallback —
     # these operations are simply unavailable on DB graphs.
     "get_block": GraphOperationRoute(
-        "logseq.Editor.getBlock", "logseq.cli.getBlock", "rejected",
-        notes="Blocked in DB mode because cli.getBlock timed out for valid blocks "
-        "immediately after a clean Logseq 2.0.1 restart, with and without "
-        "includeChildren. Use get_page_data or search instead.",
+        "logseq.Editor.getBlock", "logseq.DB.datascriptQuery", "verified",
+        notes="DB mode uses Datascript because both native getBlock routes can "
+        "hang on Logseq 2.0.1.",
     ),
     "get_block_properties": GraphOperationRoute(
         "logseq.Editor.getBlockProperties", "logseq.cli.getBlockProperties", "verified",

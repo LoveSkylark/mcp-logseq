@@ -14,8 +14,8 @@ class TestLogSeqAPI:
 
         assert manifest["list_pages"]["db_method"] == "logseq.cli.listPages"
         assert manifest["list_pages"]["db_status"] == "verified"
-        assert manifest["get_block"]["db_method"] == "logseq.cli.getBlock"
-        assert manifest["get_block"]["db_status"] == "rejected"
+        assert manifest["get_block"]["db_method"] == "logseq.DB.datascriptQuery"
+        assert manifest["get_block"]["db_status"] == "verified"
 
     def test_route_manifest_second_verification_pass(self, mock_api_key):
         """Live-tested 2026-08-23: a second round of cli.* candidates, verified
@@ -1075,14 +1075,52 @@ class TestGetBlock:
         assert request_body["args"] == ["abc-123", {"includeChildren": False}]
 
     @responses.activate
-    def test_db_mode_get_block_is_blocked_before_http(self, logseq_client):
-        """DB getBlock is blocked because it can wedge Logseq's API process."""
+    def test_db_mode_get_block_uses_datascript(self, logseq_client):
+        """DB getBlock uses Datascript instead of the hanging native route."""
         logseq_client.db_mode = True
 
-        with pytest.raises(RuntimeError, match="get_block is not available"):
-            logseq_client.get_block("abc-123", include_children=False)
+        responses.add(
+            responses.POST,
+            "http://127.0.0.1:12315/api",
+            json=[[2832, "block-uuid"]], status=200,
+        )
+        responses.add(
+            responses.POST,
+            "http://127.0.0.1:12315/api",
+            json=[["block/title", "Parent"]], status=200,
+        )
+        responses.add(
+            responses.POST,
+            "http://127.0.0.1:12315/api",
+            json=[], status=200,
+        )
 
-        assert not responses.calls
+        result = logseq_client.get_block("block-uuid", include_children=True)
+
+        assert result["content"] == "Parent"
+        assert len(responses.calls) == 3
+        for call in responses.calls:
+            assert json.loads(call.request.body)["method"] == "logseq.DB.datascriptQuery"
+
+    @responses.activate
+    def test_db_mode_get_block_builds_nested_tree_with_datascript(self, logseq_client):
+        logseq_client.db_mode = True
+        api_url = "http://127.0.0.1:12315/api"
+        responses.add(responses.POST, api_url, json=[[1, "root-uuid"]], status=200)
+        responses.add(responses.POST, api_url, json=[["block/title", "Parent"]], status=200)
+        responses.add(responses.POST, api_url, json=[[2, "child-uuid"]], status=200)
+        responses.add(responses.POST, api_url, json=[["block/title", "Child"]], status=200)
+        responses.add(responses.POST, api_url, json=[], status=200)
+
+        result = logseq_client.get_block("root-uuid")
+
+        assert result["content"] == "Parent"
+        assert result["children"][0]["uuid"] == "child-uuid"
+        assert result["children"][0]["content"] == "Child"
+        assert all(
+            json.loads(call.request.body)["method"] == "logseq.DB.datascriptQuery"
+            for call in responses.calls
+        )
 
     @responses.activate
     def test_db_get_block_from_page_data_is_limited_to_page_level_blocks(self, logseq_client_db):

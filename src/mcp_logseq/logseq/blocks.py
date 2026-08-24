@@ -5,6 +5,47 @@ from typing import Any
 logger = logging.getLogger("mcp-logseq")
 
 class BlockMixin:
+    def _get_db_block_tree(self, block_uuid: str) -> dict:
+        """Read a DB block tree through Datascript, without cli.getBlock."""
+        uuid_rows = self.datascript_query(
+            '[:find ?id ?uuid :where [?id :block/uuid ?uuid]]'
+        )
+        block_id = next(
+            (row[0] for row in uuid_rows if len(row) >= 2 and str(row[1]) == block_uuid),
+            None,
+        )
+        if block_id is None:
+            raise ValueError(f"Block '{block_uuid}' not found")
+
+        def load_node(entity_id: int, uuid: str | None = None) -> dict:
+            rows = self.datascript_query(
+                f'[:find ?a ?v :where [{int(entity_id)} ?a ?v]]'
+            )
+            node: dict = {"id": entity_id}
+            for row in rows:
+                if len(row) < 2:
+                    continue
+                attribute, value = str(row[0]), row[1]
+                key = attribute.lstrip(":").split("/")[-1]
+                if key in {"uuid", "title", "content", "parent", "page", "order", "level"}:
+                    if isinstance(value, dict) and "id" in value:
+                        value = value["id"]
+                    node[key] = value
+            node["uuid"] = str(node.get("uuid") or uuid or "")
+            node["content"] = str(node.get("title") or node.get("content") or "")
+            child_rows = self.datascript_query(
+                f'[:find ?child ?uuid :where [?child :block/parent {int(entity_id)}] '
+                f'[?child :block/uuid ?uuid]]'
+            )
+            node["children"] = [
+                load_node(int(row[0]), str(row[1]))
+                for row in child_rows
+                if len(row) >= 2
+            ]
+            return node
+
+        return load_node(int(block_id), block_uuid)
+
     def remove_block(self, block_uuid: str) -> None:
         """
         Remove a single block by UUID.
@@ -101,6 +142,14 @@ class BlockMixin:
         Returns:
             Block dict with content, properties, uuid, children, etc.
         """
+        if self.db_mode:
+            result = self._get_db_block_tree(block_uuid)
+            if not include_children:
+                result["children"] = [
+                    {"uuid": child.get("uuid")} for child in result.get("children", [])
+                ]
+            return result
+
         url = self.get_base_url()
         logger.info(f"Getting block '{block_uuid}' (children={include_children})")
 

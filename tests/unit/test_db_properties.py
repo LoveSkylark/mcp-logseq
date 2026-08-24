@@ -423,7 +423,11 @@ class TestFeatureFlagIntegration:
 
         assert "Top block" in result[0].text
         assert "Nested child" not in result[0].text
-        assert len(responses.calls) == 1
+        assert len(responses.calls) == 2
+        assert all(
+            json.loads(call.request.body)["method"] == "logseq.DB.datascriptQuery"
+            for call in responses.calls[1:]
+        )
 
     @responses.activate
     def test_set_block_properties_blocked_without_flag(self):

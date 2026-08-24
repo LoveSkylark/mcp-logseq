@@ -1966,18 +1966,18 @@ class TestGetBlockToolHandler:
     @patch("mcp_logseq.tools._get_db_mode", return_value=True)
     @patch("mcp_logseq.tools.logseq.LogSeq")
     def test_db_run_tool_without_page_name_uses_direct_get_block(self, mock_logseq_class, mock_db_mode):
-        """DB get_block fails fast rather than sending a request that can wedge Logseq."""
+        """DB get_block delegates to the safe Datascript-backed API method."""
         mock_api = Mock()
-        mock_api.get_block.side_effect = RuntimeError(
-            "get_block is not available for Logseq DB graphs"
-        )
+        mock_api.get_block.return_value = {
+            "uuid": "abc-123", "content": "DB block content", "children": []
+        }
         mock_logseq_class.return_value = mock_api
 
         handler = GetBlockToolHandler()
         result = handler.run_tool({"block_uuid": "abc-123"})
 
         mock_api.get_block.assert_called_once_with("abc-123", include_children=True)
-        assert "not available for Logseq DB graphs" in result[0].text
+        assert "DB block content" in result[0].text
 
     @patch.dict("os.environ", {"LOGSEQ_API_TOKEN": "test_token"})
     def test_run_tool_missing_block_uuid(self):
