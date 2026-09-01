@@ -89,7 +89,7 @@ Tested against the local Logseq 2.0.1 DB graph on 2026-09-01:
 | `logseq.DB.removeBlockProperty` | HTTP 200; block UUID and property ident; verified |
 | `logseq.DB.addBlockTag` | HTTP 200; block and tag UUIDs; verified |
 | `logseq.DB.removeBlockTag` | HTTP 200; block and tag UUIDs; verified |
-| `logseq.DB.setBlockIcon` | HTTP 200; Tabler icon; verified |
+| `logseq.DB.setBlockIcon` | HTTP 200; Tabler ID and case-sensitive emoji-mart display name verified |
 | `logseq.DB.removeBlockIcon` | HTTP 200; absence verified |
 | `logseq.DB.addPropertyValueChoices` | HTTP 200; effect not observable; not exposed |
 | `logseq.DB.getFileContent` | HTTP 200/null for missing path; not exposed |
@@ -100,9 +100,11 @@ The timed-out `setPropertyNodeTags` request was followed by successful normal
 requests and exact cleanup without restarting Logseq or the test process.
 
 All promoted writes also passed through MCP in one reversible end-to-end run.
-The disposable property was removed. Two tags named `MCP Lab Tag A 01f05ca9`
-and `MCP Lab Tag B 01f05ca9` remain because this DB-only method set has no tag
-removal operation.
+Emoji names `Test Tube` and `Books` were verified; Logseq stores their normalized
+IDs `test_tube` and `books`. The F4A2 malformed child/grandchild and tag were
+removed. Its ten pages are recycled, so their blocks remain queryable, and the
+user property `MCP Lab F4A2 Status` remains because all tested API removal forms
+were no-ops.
 
 Monitoring callbacks (`onChanged`, `onBlockChanged`) cannot be transported as
 ordinary request/response HTTP calls and remain unavailable. Block, tag, icon,

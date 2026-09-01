@@ -168,7 +168,7 @@ def create_server(client: LogseqDBClient) -> MCPServer:
     async def db_set_block_icon(
         block_uuid: str, icon_type: str, icon_name: str
     ) -> dict[str, Any]:
-        """Set and verify an emoji or Tabler icon on an exact block UUID."""
+        """Set and verify an icon. For emoji, use its case-sensitive emoji-mart display name, such as 'Test Tube' or 'Books', not a glyph or ID."""
         return (
             await VerifiedMutations(client).set_block_icon(
                 block_uuid, icon_type, icon_name

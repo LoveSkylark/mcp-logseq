@@ -43,8 +43,47 @@ write methods come from the server's dated live-verification manifest; they
 are not re-probed on startup because doing so would mutate the graph. Candidate
 methods have not passed complete read-back testing and must not be called.
 
+Read the fields precisely:
+
+- `supported_read_operations` and `supported_query_features` were probed
+  against the connected process during this call.
+- `supported_write_operations` and `supported_removal_operations` are the
+  server's dated, promoted write manifest. They are not destructive startup
+  probes. A listed method may still fail if the connected Logseq build differs.
+- `candidate_write_operations` are allowed internally for further controlled
+  testing but are not MCP capabilities. Do not call or advertise them.
+- `unavailable_over_http` methods are rejected for this server/build and must
+  not be retried.
+
 The Logseq API is version-sensitive. The tool list and current capability
 result take precedence over examples or remembered behavior.
+
+## Node model
+
+Read this before reasoning about graph structure. Pages, blocks, tags, and
+properties share Logseq's entity store and commonly expose `:block/uuid` and
+`:block/title`. Their attributes and tags determine their role; pages normally
+carry `:block/name`.
+
+- `:block/parent` references the immediate page or block ancestor.
+- `:block/page` is the denormalized owning page and is independent of the
+  immediate parent for nested blocks.
+- `:block/order` is a fractional-index string used to order siblings.
+
+This MCP has no page/block content or hierarchy mutation tool, but the model
+still matters when reading query results. A nested node whose `:block/page`
+points to a non-page is malformed even if Logseq renders it under its parent.
+When investigating structure, verify parent and owning page independently.
+
+Use this bounded diagnostic when malformed ownership is suspected:
+
+```clojure
+[:find (pull ?entity [:db/id :block/title
+                      {:block/page [:db/id :block/title]}])
+ :where
+ [?entity :block/page ?page]
+ [(missing? $ ?page :block/name)]]
+```
 
 ## DB identity rules
 
@@ -53,8 +92,15 @@ Logseq DB entities can expose bare fields such as `id`, `ident`, `uuid`, and
 
 - Properties: read and remove by exact namespaced ident, for example
   `:logseq.property/status` or `:plugin.property._test_plugin/MyProperty`.
-- Tags: reads may use exact ident, UUID, or exact title. All tag mutations use
-  exact tag UUIDs.
+- Tags: `db_get_tag` accepts exact ident, UUID, or resolvable title.
+  `db_get_tags_by_name` follows Logseq's normalized internal-name lookup and a
+  display title may not resolve for every plugin-created tag. Prefer
+  `db_get_all_tags`, then retain the returned ident and UUID. All tag mutations
+  use exact tag UUIDs.
+- The MCP accepts a property ident for both tag-property tools. For removal,
+  the server resolves that ident to the property UUID required by Logseq.
+- A bare property display name is rejected by this MCP before HTTP when an
+  exact ident is required. Continue to pass full idents.
 - Blocks/nodes: all metadata mutations use exact block UUIDs.
 - Never select a destructive target from a fuzzy search result alone.
 - Resolve the entity, show its exact identity, and validate its current state
@@ -159,7 +205,12 @@ Ask for confirmation before:
   resolves the property ident to the UUID form required by Logseq.
 - `db_add_tag_extends(tag_uuid, parent_tag_uuid)` adds inheritance.
 - `db_remove_tag_extends(tag_uuid, parent_tag_uuid)` removes inheritance.
-- Read the child tag before and after changing its schema or parentage.
+- On the tested build, adding an extension replaced the existing Root parent
+  rather than appending another parent. Read the child's
+  `:logseq.property.class/extends` before and after the write, preserve the
+  prior parent, and explain the replacement risk to the user.
+- Removing that extension restored Root in the verified test. Read back rather
+  than assuming restoration on another build.
 
 ### Tagging a block
 
@@ -169,18 +220,30 @@ Ask for confirmation before:
 
 ## Block icons
 
-- `db_set_block_icon` accepts `icon_type` of `tabler-icon` or `emoji` and the
-  corresponding icon name/value.
+- `db_set_block_icon` accepts `icon_type` of `tabler-icon` or `emoji`.
+- For `tabler-icon`, pass the Tabler ID such as `flask`.
+- For `emoji`, pass the case-sensitive emoji-mart display name, such as
+  `Test Tube` or `Books`. Do not pass a literal glyph (`🧪`), shortcode,
+  lowercase ID (`test_tube`), or plural ID (`books`). Logseq resolves the
+  display name and stores its normalized ID.
 - `db_remove_block_icon` removes the icon from an exact block UUID.
 - The server reads back `:logseq.property/icon` after both operations.
 
 ## Verification and timeout handling
 
-Every exposed write performs server-side read-back. A successful HTTP status
-alone is not considered success.
+Every exposed write returns an envelope containing `response`,
+`verified_state`, and `recovered_after_timeout`. A successful HTTP status alone
+is not considered success.
 
-- Claim success only when the MCP result contains the expected
-  `verified_state`.
+- `response` is often `null` for a successful Logseq mutation. Treat it as the
+  raw API result, not verification evidence.
+- `verified_state` is the server's post-write read-back. Claim success only
+  when it contains the expected attribute or relationship.
+- For `db_remove_property`, both `response` and `verified_state` are `null`
+  after verified absence. For relationship/icon removals, `verified_state`
+  normally contains the surviving entity without the removed value.
+- `recovered_after_timeout=true` means the original response was ambiguous but
+  read-back established the resulting state. Mention that recovery explicitly.
 - A timed-out write may have committed. Never immediately repeat it.
 - Read the exact target with a fresh tool call and reconcile observed state.
 - If creation timed out before Logseq returned a generated ident, stop and
@@ -194,10 +257,11 @@ alone is not considered success.
 - `setPropertyNodeTags`: rejected after a live timeout.
 - Property value choices: transport returned success, but the requested effect
   was not observable through the available property reader, so no MCP tool is
-  exposed.
+  exposed and it remains a candidate.
 - `onChanged` and `onBlockChanged`: callback APIs cannot cross the ordinary
   request/response HTTP boundary.
-- File reads/writes: no real DB file target has passed verification.
+- File reads/writes: `setFileContent` is a candidate, not a supported tool. No
+  real DB file target has passed write/read-back/cleanup verification.
 - Page/block content creation, editing, movement, and deletion: no approved
   `logseq.DB.*` methods are available in this server.
 
@@ -238,3 +302,15 @@ Before writing, state the exact entities and intended changes. After writing,
 summarize the verified result, any generated ident, and any remaining
 irreversible fixture or uncertainty. Never claim that unsupported page/block
 content work was completed through metadata-only tools.
+
+### Capability claims
+
+- A tool description describes one endpoint, not the complete DB schema.
+- Do not infer a graph-wide limitation from one tool refusal. Distinguish
+  unavailable MCP functionality from an impossible DB state.
+- Conversely, do not claim capability because the UI renders a result. Verify
+  the underlying attributes through an exact read.
+- Label findings with the MCP server and Logseq build that produced them. Do
+  not transfer behavior from the legacy `mcp-logseq` server to this one.
+- Communicate the boundary early: this server supports queries and metadata
+  writes, but not page/block content or hierarchy writes.

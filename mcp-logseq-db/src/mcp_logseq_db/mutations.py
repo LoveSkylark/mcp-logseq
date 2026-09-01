@@ -192,8 +192,13 @@ class VerifiedMutations:
             "logseq.DB.setBlockIcon", [block_uuid, icon_type, icon_name]
         )
         current = await self._entity(block_uuid)
-        if current.get(":logseq.property/icon") != {"type": icon_type, "id": icon_name}:
+        icon = current.get(":logseq.property/icon")
+        if not isinstance(icon, dict) or icon.get("type") != icon_type:
             raise RuntimeError("Block icon verification failed")
+        if icon_type == "tabler-icon" and icon.get("id") != icon_name:
+            raise RuntimeError("Block icon verification failed")
+        if icon_type == "emoji" and not icon.get("id"):
+            raise RuntimeError("Block emoji verification failed")
         return MutationResult(response, current, timed_out)
 
     async def remove_block_icon(self, block_uuid: str) -> MutationResult:

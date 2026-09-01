@@ -94,3 +94,17 @@ async def test_icon_type_is_restricted() -> None:
 
     with pytest.raises(ValueError, match="icon_type"):
         await mutations.set_block_icon(TAG_UUID, "image", "file.png")
+
+
+@pytest.mark.asyncio
+async def test_emoji_verification_accepts_normalized_stored_id() -> None:
+    client = RecordingClient([
+        None,
+        {"uuid": TAG_UUID, ":logseq.property/icon": {"type": "emoji", "id": "test_tube"}},
+    ])
+
+    result = await VerifiedMutations(client).set_block_icon(  # type: ignore[arg-type]
+        TAG_UUID, "emoji", "Test Tube"
+    )
+
+    assert result.verified_state[":logseq.property/icon"]["id"] == "test_tube"
