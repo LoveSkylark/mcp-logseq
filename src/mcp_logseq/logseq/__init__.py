@@ -312,13 +312,13 @@ class LogSeq(PageMixin, BlockMixin, PropertyMixin, TagMixin, SearchMixin):
         self.port = port
         self.verify_ssl = verify_ssl
         self.db_mode = db_mode
-        self.timeout = timeout or (3, 6)
+        self.timeout = timeout or (3, 15)
 
         # Reuse connections while allowing concurrent MCP requests to proceed.
         self._session = SafeAPISession()
         adapter = requests.adapters.HTTPAdapter(
-            pool_connections=10,
-            pool_maxsize=10,
+            pool_connections=1,
+            pool_maxsize=1,
             max_retries=0,
         )
         self._session.mount("http://", adapter)
